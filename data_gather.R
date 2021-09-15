@@ -1,0 +1,80 @@
+library(covidcast)
+library(tidyverse)
+
+# full_work_hr <- covidcast_signal(data_source = "safegraph",
+#                                 signal = "full_time_work_prop_7dav",
+#                                 geo_type = "county", geo_values = "36061")
+
+# part_work_prop <- covidcast_signal(data_source = "safegraph",
+#                                   signal = "part_time_work_prop_7dav",
+#                                   geo_type = "county", geo_values = "36061")
+
+bar_visit_prop <- covidcast_signal(data_source = "safegraph",
+                                  signal = "bars_visit_prop",
+                                  geo_type = "county", geo_values = "36061")
+
+restaurant_visit_prop <- covidcast_signal(data_source = "safegraph",
+                                          signal = "restaurants_visit_prop",
+                                          geo_type = "county", geo_values = "36061")
+
+mask_prop <- covidcast_signal(data_source = "fb-survey",
+                              signal = "smoothed_wearing_mask_7d",
+                              geo_type = "county", geo_values = "36061")
+
+other_mask_prop <- covidcast_signal(data_source = "fb-survey",
+                              signal = "smoothed_wothers_masked_public",
+                              geo_type = "county", geo_values = "36061")
+
+distancing <- covidcast_signal(data_source = "fb-survey",
+                                signal = "smoothed_wothers_distanced_public",
+                                geo_type = "county", geo_values = "36061")
+
+public_transit <- covidcast_signal(data_source = "fb-survey",
+                               signal = "smoothed_wpublic_transit_1d",
+                               geo_type = "county", geo_values = "36061")
+
+worked_outside <- covidcast_signal(data_source = "fb-survey",
+                                signal = "smoothed_wwork_outside_home_indoors_1d",
+                                geo_type = "county", geo_values = "36061")
+
+large_events <- covidcast_signal(data_source = "fb-survey",
+                                 signal = "smoothed_wlarge_event_indoors_1d",
+                                 geo_type = "county", geo_values = "36061")
+
+school_full <- covidcast_signal(data_source = "fb-survey",
+                                signal = "smoothed_winperson_school_fulltime",
+                                geo_type = "county", geo_values = "36061")
+
+school_part <- covidcast_signal(data_source = "fb-survey",
+                                signal = "smoothed_winperson_school_parttime",
+                                geo_type = "county", geo_values = "36061")
+
+# vacc_accept <- covidcast_signal(data_source = "fb_survey",
+#                                signal = "smoothed_wcovid_vaccinated_appointment_or_accept",
+#                                geo_type = "county", geo_values = "36061")
+
+cases <- covidcast_signal(data_source = "indicator-combination",
+                          signal = "confirmed_7dav_incidence_num",
+                          geo_type = "county", geo_values = "36061")
+
+adjoin <- function(dataset, feature, feature_name) {
+  match1 <- dataset$date %in% feature$time_value
+  match2 <- feature$time_value %in% dataset$date
+  dataset <- dataset[match1,]
+  dataset <- cbind.data.frame(dataset, feature$value[match2])
+  names(dataset)[1] = "date"
+  names(dataset)[names(dataset)=="feature$value[match2]"] = feature_name
+  
+  return(dataset)
+}
+
+dataset <- data.frame(date = distancing$time_value)
+
+dataset <- adjoin(dataset, distancing, "distancing")
+dataset <- adjoin(dataset, bar_visit_prop, "bar_visit")
+dataset <- adjoin(dataset, large_events, "large_events")
+dataset <- adjoin(dataset, mask_prop, "mask_prop")
+dataset <- adjoin(dataset, other_mask_prop, "other_mask_prop")
+dataset <- adjoin(dataset, public_transit, "public_transit")
+dataset <- adjoin(dataset, restaurant_visit_prop, "resto_visit")
+dataset <- adjoin(dataset, cases, "cases")
