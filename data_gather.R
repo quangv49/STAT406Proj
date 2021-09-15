@@ -77,4 +77,7 @@ dataset <- adjoin(dataset, mask_prop, "mask_prop")
 dataset <- adjoin(dataset, other_mask_prop, "other_mask_prop")
 dataset <- adjoin(dataset, public_transit, "public_transit")
 dataset <- adjoin(dataset, restaurant_visit_prop, "resto_visit")
+dataset <- adjoin(dataset, worked_outside, "worked_outside")
 dataset <- adjoin(dataset, cases, "cases")
+
+write.csv(dataset,".\\pblc_bhv_covid.csv",row.names=F)
