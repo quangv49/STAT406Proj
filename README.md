@@ -1,4 +1,4 @@
-# Enter your title here
+# How does public behavior affect the spread of COVID-19?
 
 ## Team members
 
@@ -8,37 +8,48 @@ Quang Vuong
 ## Description of the data 
 
 The data includes the number of new COVID-19 cases per day as well as various survey results indicating public behavior from 5 Jun 2021 to 5 Sep 2021 in Manhattan, New York. The variables are:
+
 - cases = New daily cases of COVID-19, averaged over 7 days
 - distancing = Percentage of survey respondents reporting that people maintained a distance of at least 6ft
 - public_transit = Percentage of survey respondents reporting that they used public transit in the last day
-- 
+- worked_outside = Percentage of survey respondents who was indoors (excluding home) in the last day
+- large_events = Percentage of survey respondents who attended a crowded event in the last day
+- mask_prop = Percentage of survey respondents who mostly wore a mask outside in the last week
+- other_mask_prop = Percentage of survey respondents saying that other people mostly wore a mask outside
+- bar_visit = Number of bar visits per 100000 people
+- resto_visit = Number of restaurant visits per 100000 people
+
+There are 88 observations in the dataset. "cases" is the response variable, while the other 8 are predictors.
 
 ## Precise description of the question(s)
 
-you are trying to answer 
+What aspects of public behavior are important in predicting the spread of COVID-19?
+
+How are the aspects of public behavior mathematically related to the spread of COVID-19?
 
 ## Why this question/dataset
 
-a few sentences describing why this question/dataset is interesting to you
+It is known that limiting contact with other people also limits the spread of COVID-19. I am interested in whether some forms of social contact lead to more transmission of COVID-19 or not; in other words, I want to examine more closely how social contact is related to the spread of COVID-19. I picked Manhattan, New York just because.
 
 ## Reading list 
 
-(papers you may need to read)
+Covidcast documentation
+
 ## Team contract. 
 
 For each area, write 1-2 sentences and including any rules to which your team collectively agrees (e.g. "We agree to make 1 commit per week." or "We agree to meet in the library every other Friday.")
 
 **Participation**  
-We agree to ...
+I agree to be fully responsible for my project and make 1 commit per week. The commit should include substantial progress for the project.
 
 **Communication**  
-We agree to ...
+I agree to detail my thought process in my commit messages and comment my code clearly.
 
 **Meetings**  
-We agree to ...
+I agree to ask Dr. Macdonald and the TAs if I have questions.
 
 **Conduct**  
-We agree to ...
+I agree to be respectful and open to learn from Dr. Macdonald, the TAs and my classmates.
 
 ***
 Do not make any changes from here on. Only the TAs will edit the following.
