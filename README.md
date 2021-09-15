@@ -2,15 +2,16 @@
 
 ## Team members
 
-*
-*
-*
+Quang Vuong
 
 
 ## Description of the data 
 
-(include the number of observations, number of predictors, what the different predictors are, etc.)
-
+The data includes the number of new COVID-19 cases per day as well as various survey results indicating public behavior from 5 Jun 2021 to 5 Sep 2021 in Manhattan, New York. The variables are:
+- cases = New daily cases of COVID-19, averaged over 7 days
+- distancing = Percentage of survey respondents reporting that people maintained a distance of at least 6ft
+- public_transit = Percentage of survey respondents reporting that they used public transit in the last day
+- 
 
 ## Precise description of the question(s)
 
