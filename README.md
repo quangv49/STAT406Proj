@@ -29,11 +29,14 @@ How are the aspects of public behavior mathematically related to the spread of C
 
 ## Why this question/dataset
 
-It is known that limiting contact with other people also limits the spread of COVID-19. I am interested in whether some forms of social contact lead to more transmission of COVID-19 or not; in other words, I want to examine more closely how social contact is related to the spread of COVID-19. I picked Manhattan, New York just because.
+It is known that limiting contact with other people also limits the spread of COVID-19. I am interested in whether some forms of social contact lead to more transmission of COVID-19 or not; in other words, I want to examine more closely how social contact is related to the spread of COVID-19. I arbitrarily picked Manhattan, New York for analysis; I also thought that data from a densely populated area might be more fit to answer these types of question.
 
 ## Reading list 
 
-Covidcast documentation
+- Covidcast documentation
+- Liu, McQuarrie, Song and Colijn (2021), "Modelling the impact of household size distribution on the transmission dynamics of COVID-19"
+- Are and Colijn (2021), "Projected spread of COVID-19's second wave in South Africa under different levels of lockdown"
+- Tupper, Boury, Yerlanov and Colijn (2020), "Event-specific interventions to minimize COVID-19 transmission"
 
 ## Team contract. 
 
