@@ -1,13 +1,6 @@
 library(covidcast)
-library(tidyverse)
 
-# full_work_hr <- covidcast_signal(data_source = "safegraph",
-#                                 signal = "full_time_work_prop_7dav",
-#                                 geo_type = "county", geo_values = "36061")
-
-# part_work_prop <- covidcast_signal(data_source = "safegraph",
-#                                   signal = "part_time_work_prop_7dav",
-#                                   geo_type = "county", geo_values = "36061")
+#Gathering data from Covidcast
 
 bar_visit_prop <- covidcast_signal(data_source = "safegraph",
                                   signal = "bars_visit_prop",
@@ -41,22 +34,13 @@ large_events <- covidcast_signal(data_source = "fb-survey",
                                  signal = "smoothed_wlarge_event_indoors_1d",
                                  geo_type = "county", geo_values = "36061")
 
-school_full <- covidcast_signal(data_source = "fb-survey",
-                                signal = "smoothed_winperson_school_fulltime",
-                                geo_type = "county", geo_values = "36061")
-
-school_part <- covidcast_signal(data_source = "fb-survey",
-                                signal = "smoothed_winperson_school_parttime",
-                                geo_type = "county", geo_values = "36061")
-
-# vacc_accept <- covidcast_signal(data_source = "fb_survey",
-#                                signal = "smoothed_wcovid_vaccinated_appointment_or_accept",
-#                                geo_type = "county", geo_values = "36061")
-
 cases <- covidcast_signal(data_source = "indicator-combination",
                           signal = "confirmed_7dav_incidence_num",
                           geo_type = "county", geo_values = "36061")
 
+#This function adds a new feature to the current dataset. It takes
+#into account the fact that some feature has missing values for a
+#few days
 adjoin <- function(dataset, feature, feature_name) {
   match1 <- dataset$date %in% feature$time_value
   match2 <- feature$time_value %in% dataset$date
@@ -68,6 +52,7 @@ adjoin <- function(dataset, feature, feature_name) {
   return(dataset)
 }
 
+#Constructing dataset
 dataset <- data.frame(date = distancing$time_value)
 
 dataset <- adjoin(dataset, distancing, "distancing")
@@ -80,4 +65,5 @@ dataset <- adjoin(dataset, restaurant_visit_prop, "resto_visit")
 dataset <- adjoin(dataset, worked_outside, "worked_outside")
 dataset <- adjoin(dataset, cases, "cases")
 
+#Write to csv file
 write.csv(dataset,".\\pblc_bhv_covid.csv",row.names=F)
