@@ -43,16 +43,16 @@ It is known that limiting contact with other people also limits the spread of CO
 For each area, write 1-2 sentences and including any rules to which your team collectively agrees (e.g. "We agree to make 1 commit per week." or "We agree to meet in the library every other Friday.")
 
 **Participation**  
-I agree to be fully responsible for my project and make 1 commit per week. The commit should include substantial progress for the project.
+I agree to be fully responsible for my project and make 1 commit per week. Each commit should include substantial progress for the project.
 
 **Communication**  
 I agree to detail my thought process in my commit messages and comment my code clearly.
 
 **Meetings**  
-I agree to ask Dr. Macdonald and the TAs if I have questions.
+I agree to ask Dr. McDonald and the TAs if I have questions.
 
 **Conduct**  
-I agree to be respectful and open to learn from Dr. Macdonald, the TAs and my classmates.
+I agree to be respectful and open to learn from Dr. McDonald, the TAs and my classmates.
 
 ***
 Do not make any changes from here on. Only the TAs will edit the following.
