@@ -42,6 +42,8 @@ It is known that limiting contact with other people also limits the spread of CO
 
 For each area, write 1-2 sentences and including any rules to which your team collectively agrees (e.g. "We agree to make 1 commit per week." or "We agree to meet in the library every other Friday.")
 
+I am doing this project individually. I make the following commitments.
+
 **Participation**  
 I agree to be fully responsible for my project and make 1 commit per week. Each commit should include substantial progress for the project.
 
