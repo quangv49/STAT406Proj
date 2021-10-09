@@ -1,0 +1,47 @@
+---
+title: "Report"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+```{r cars}
+
+```
+
+## Explanatory data analysis
+
+Firstly, we plot all predictors against the number of cases.
+
+```{r pressure, echo=FALSE}
+covid <- read.table("pblc_bhv_covid.csv",sep = ',', header=TRUE)
+
+with(covid,plot(distancing,cases))
+with(covid,plot(bar_visit,cases))
+with(covid,plot(large_events,cases))
+with(covid,plot(mask_prop,cases))
+with(covid,plot(other_mask_prop,cases))
+with(covid,plot(public_transit,cases))
+with(covid,plot(resto_visit,cases))
+with(covid,plot(worked_outside,cases))
+```
+
+`distancing`, `bar_visit` and `large_events` appear to have two clusters with different mean case counts. On the other hand, `mask_prop`, `other_mask_prop`, `resto_visit` and `worked_outside` appear to have two trend lines. `public_transit` also looks like there are two trend lines, but both are quite flat. This suggests that modelling `distancing`, `bar_visit` and `large_events` as two-level factors with interactions with the remaining predictors might be profitable.
+
+We will now examine the covariance matrix of the predictors.
+
+```{r}
+predictors <- subset(covid, select=-c(cases,date))
+
+cor_pred <- cor(as.matrix(predictors))
+
+for (i in 1:ncol(predictors)) {
+  print(cor_pred[i, abs(cor_pred[i,]) > 0.6])
+}
+```
+
+There is some substantial correlation between some predictors, which can be further explored with plots. In particular, `bar_visit`, `mask_prop`, `large_events` and `other_mask_prop` seem correlated with each other. This suggests that a regularization approach can be profitable.
