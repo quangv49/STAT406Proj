@@ -15,10 +15,20 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Explanatory data analysis
 
-Firstly, we plot all predictors against the number of cases.
+We first examine the descriptive statistics of the response and all predictors.
 
-```{r pressure, echo=FALSE}
+```{r indiv_boxplots, echo=FALSE}
 covid <- read.table("pblc_bhv_covid.csv",sep = ',', header=TRUE)
+boxplot(covid[2:6], xlab="Variables", ylab="Values", main="Boxplots of variables")
+boxplot(covid[6:10], xlab="Variables", ylab="Values", main="Boxplots of variables")
+```
+It is clear that all variables have very different scales from each other, so models with unstandardized and standardized variables should be examined.
+
+We plot all predictors against the number of cases.
+
+```{r plots_against_cases, echo=FALSE}
+
+par(mfrow=c(3,3))
 
 with(covid,plot(distancing,cases))
 with(covid,plot(bar_visit,cases))
@@ -30,7 +40,7 @@ with(covid,plot(resto_visit,cases))
 with(covid,plot(worked_outside,cases))
 ```
 
-`distancing`, `bar_visit` and `large_events` appear to have two clusters with different mean case counts. On the other hand, `mask_prop`, `other_mask_prop`, `resto_visit` and `worked_outside` appear to have two trend lines. `public_transit` also looks like there are two trend lines, but both are quite flat. This suggests that modelling `distancing`, `bar_visit` and `large_events` as two-level factors with interactions with the remaining predictors might be profitable.
+`distancing`, `bar_visit` and `large_events` appear to have two clusters with different mean case counts. On the other hand, `mask_prop`, `other_mask_prop`, `resto_visit` and `worked_outside` appear to have two trend lines. `public_transit` also looks like there are two trend lines, but both are quite flat. This suggests that modelling `distancing`, `bar_visit` and `large_events` as two-level factors with interactions with the remaining predictors might be profitable. A tree-based regression method might also be worth exploring.
 
 We will now examine the covariance matrix of the predictors.
 
