@@ -9,24 +9,43 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-```{r cars}
+We wish to investigate how public behavior affects the spread of COVID-19 within a community. In particular, our goal is to identify which aspects of public behavior, such as visiting restaurants, visiting bars and using public transit, predict case counts. Since many other factors including population demographics, population density and policy decisions also affect the spread of COVID-19, it is best to focus on datasets for a sufficiently small geographical area (like a city or a county) so that the confounding factors unrelated to the study are controlled.
 
-```
+The present dataset contains daily COVID-19 case counts for 88 days from June 5th, 2021 to September 5th, 2021, along with several indicators of public behavior, in Manhanttan, New York. The indicators of public behavior are:
+
+- `distancing` = Percentage of survey respondents reporting that people maintained a distance of at least 6ft
+- `public_transit` = Percentage of survey respondents reporting that they used public transit in the last day
+- `worked_outside` = Percentage of survey respondents who was indoors (excluding home) in the last day
+- `large_events` = Percentage of survey respondents who attended a crowded event in the last day
+- `mask_prop` = Percentage of survey respondents who mostly wore a mask outside in the last week
+- `other_mask_prop` = Percentage of survey respondents saying that other people mostly wore a mask outside
+- `bar_visit` = Number of bar visits per 100000 people
+- `resto_visit` = Number of restaurant visits per 100000 people
+
+Most of these indicators are obtained from Facebook surveys. Taking into account the issues of survey data such as response bias and subjectivity of answers, it is extremely unlikely that the variables in the dataset track their true respective quantities. Instead, we opt to interpret these indicators as proxies of public behavior, which are potentially useful for prediction.
+
+Now we will summarize our two objectives for this study:
+\begin{enumerate}
+\item Identify which of the above indicators are important in predicting COVID-19 case counts.
+\item Identify a model which can be used to predict future COVID-19 case counts.
+\end{enumerate}
 
 ## Explanatory data analysis
 
 We first examine the descriptive statistics of the response and all predictors.
 
-```{r indiv_boxplots, echo=FALSE}
+```{r indiv_boxplots, echo=FALSE, fig.height=8}
 covid <- read.table("pblc_bhv_covid.csv",sep = ',', header=TRUE)
-boxplot(covid[2:6], xlab="Variables", ylab="Values", main="Boxplots of variables")
-boxplot(covid[6:10], xlab="Variables", ylab="Values", main="Boxplots of variables")
+par(mfrow=c(3,3))
+for (i in 2:10) {
+  boxplot(covid[i], xlab=names(covid)[i], ylab="Values")
+}
 ```
-It is clear that all variables have very different scales from each other, so models with unstandardized and standardized variables should be examined.
+It is clear that all variables have very different scales from each other, so models with unstandardized and standardized variables should be examined. About the distribution of the variables, `distancing`, `bar_visit`, `other_mask_prop`, and `cases` are skewed to the right, while the others are roughly symmetrical.
 
 We plot all predictors against the number of cases.
 
-```{r plots_against_cases, echo=FALSE}
+```{r plots_against_cases, echo=FALSE, fig.height = 8}
 
 par(mfrow=c(3,3))
 
@@ -44,7 +63,7 @@ with(covid,plot(worked_outside,cases))
 
 We will now examine the covariance matrix of the predictors.
 
-```{r}
+```{r correlations}
 predictors <- subset(covid, select=-c(cases,date))
 
 cor_pred <- cor(as.matrix(predictors))
@@ -54,4 +73,77 @@ for (i in 1:ncol(predictors)) {
 }
 ```
 
-There is some substantial correlation between some predictors, which can be further explored with plots. In particular, `bar_visit`, `mask_prop`, `large_events` and `other_mask_prop` seem correlated with each other. This suggests that a regularization approach can be profitable.
+There is some substantial correlation between some predictors. In particular, `bar_visit`, `mask_prop`, `large_events` and `other_mask_prop` seem correlated with each other. This suggests that a regularization approach can be profitable.
+
+Considering the observed clustering behavior with the correlation of several predictors, a natural hypothesis to make is that the correlation of the variables is due to the clustering behavior. Of course, the validity of this hypothesis depends on whether the clusters are based on date (which is possible since COVID-19 spread is in waves) or based on the predictors themselves. Hence, we now try to identify how the clusters are split.
+
+To do this, we attempt to fit a regression tree and look at the split at the root. Please note that we are only using this tree to expedite the exploration rather than seriously considering as a model.
+
+```{r eda-tree, echo = F}
+library(rpart)
+
+covid$time <- 1:nrow(covid)
+
+eda_tree <- rpart(cases ~ .-date, data = covid, method = "anova")
+plot(eda_tree, uniform = F, margin = 0.05)
+text(eda_tree, pretty = T)
+```
+
+Initial inspection of this tree shows that there is clustering by date. Now we try other splits.
+
+```{r eda-tree2, echo = F}
+eda_tree2 <- rpart(cases ~ .-date-time, data = covid, method = "anova")
+plot(eda_tree2, uniform = F, margin = 0.05)
+text(eda_tree2, pretty = T)
+```
+
+With the two splitting criteria, we can plot the predictors against cases again.
+
+```{r plot-time-split, echo = F, fig.height=8}
+par(mfrow=c(3,3))
+
+covid_ts <- covid[covid$time < 51.5, ]
+
+with(covid_ts,plot(distancing,cases))
+with(covid_ts,plot(bar_visit,cases))
+with(covid_ts,plot(large_events,cases))
+with(covid_ts,plot(mask_prop,cases))
+with(covid_ts,plot(other_mask_prop,cases))
+with(covid_ts,plot(public_transit,cases))
+with(covid_ts,plot(resto_visit,cases))
+with(covid_ts,plot(worked_outside,cases))
+
+covid$date[covid$time == 51]
+```
+
+```{r plot-mask-split, echo = F, fig.height=8}
+par(mfrow=c(3,3))
+
+covid_ms <- covid[covid$mask_prop < 70.67, ]
+
+with(covid_ms,plot(distancing,cases))
+with(covid_ms,plot(bar_visit,cases))
+with(covid_ms,plot(large_events,cases))
+with(covid_ms,plot(mask_prop,cases))
+with(covid_ms,plot(other_mask_prop,cases))
+with(covid_ms,plot(public_transit,cases))
+with(covid_ms,plot(resto_visit,cases))
+with(covid_ms,plot(worked_outside,cases))
+```
+
+It is clear that splitting by date reduces the clustering behavior so that trends are now much clearer. We will keep this in mind when proceeding with the analysis. We show the plots for the other cluster for completion. The split in date corresponds to cases on and before July 25th, 2021 and cases after this date.
+
+```{r plot-time-split2, echo = F, fig.height=8}
+par(mfrow=c(3,3))
+
+covid_ts <- covid[covid$time >= 51.5, ]
+
+with(covid_ts,plot(distancing,cases))
+with(covid_ts,plot(bar_visit,cases))
+with(covid_ts,plot(large_events,cases))
+with(covid_ts,plot(mask_prop,cases))
+with(covid_ts,plot(other_mask_prop,cases))
+with(covid_ts,plot(public_transit,cases))
+with(covid_ts,plot(resto_visit,cases))
+with(covid_ts,plot(worked_outside,cases))
+```
