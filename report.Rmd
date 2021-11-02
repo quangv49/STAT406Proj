@@ -1,18 +1,18 @@
 ---
 title: "How does public behavior affect the spread of COVID-19? - Initial report"
 author: "Quang Vuong"
-output: pdf_document
+output: bookdown::pdf_document2
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = F)
 ```
 
 ## Introduction
 
 We wish to investigate how public behavior affects the spread of COVID-19 within a community. In particular, our goal is to identify which aspects of public behavior, such as visiting restaurants, visiting bars and using public transit, predict case counts. Since many other factors including population demographics, population density and policy decisions also affect the spread of COVID-19, it is best to focus on datasets for a sufficiently small geographical area (like a city or a county) so that the confounding factors unrelated to the study are controlled.
 
-The present dataset contains daily COVID-19 case counts for 88 days from June 5th, 2021 to September 5th, 2021, along with several indicators of public behavior, in Manhanttan, New York. The indicators of public behavior are:
+The present dataset, collected from the `{covidcast}` API, contains daily COVID-19 case counts for 88 days from June 5th, 2021 to September 5th, 2021, along with several indicators of public behavior, in Manhanttan, New York. The indicators of public behavior are:
 
 - `distancing` = Percentage of survey respondents reporting that people maintained a distance of at least 6ft
 - `public_transit` = Percentage of survey respondents reporting that they used public transit in the last day
@@ -33,9 +33,9 @@ Now we will summarize our two objectives for this study:
 
 ## Explanatory data analysis
 
-We first examine the descriptive statistics of the response and all predictors.
+We first examine the descriptive statistics of the response and all predictors. This is done by looking at their boxplots, as in Figure \@ref(fig:indiv_boxplots).
 
-```{r indiv_boxplots, echo=FALSE, fig.height=8}
+```{r indiv_boxplots, echo=FALSE, fig.height=8, fig.cap = "Boxplots of individual predictors and COVID-19 case counts."}
 covid <- read.table("pblc_bhv_covid.csv",sep = ',', header=TRUE)
 par(mfrow=c(3,3))
 for (i in 2:10) {
@@ -44,9 +44,9 @@ for (i in 2:10) {
 ```
 It is clear that all variables have very different scales from each other, so models with unstandardized and standardized variables should be examined. About the distribution of the variables, `distancing`, `bar_visit`, `other_mask_prop`, and `cases` are skewed to the right, while the others are roughly symmetrical.
 
-We plot all predictors against the number of cases.
+We plot all predictors against the number of cases in Figure \@ref(fig:plots_against_cases).
 
-```{r plots_against_cases, echo=FALSE, fig.height = 8}
+```{r plots_against_cases, echo=FALSE, fig.height = 8, fig.cap = "Scatterplots of predictors against case counts."}
 
 par(mfrow=c(3,3))
 
@@ -64,7 +64,7 @@ with(covid,plot(worked_outside,cases))
 
 To continue the examination of the dataset, we will now look at the covariance matrix of the predictors.
 
-```{r correlations}
+```{r correlations, fig.cap = "Entries of correlation matrix with high coefficients."}
 predictors <- subset(covid, select=-c(cases,date))
 
 cor_pred <- cor(as.matrix(predictors))
@@ -80,27 +80,27 @@ Following the observed clustering behavior and the correlation of several predic
 
 To do this, we attempt to fit a regression tree and look at the split at the root. Please note that we are only using this tree to expedite the exploration rather than seriously considering as a model.
 
-```{r eda-tree, echo = F, fig.height=3}
+```{r eda-tree, echo = F, fig.height=3, fig.cap = "Regression tree to determine clusters in data."}
 library(rpart)
 
 covid$time <- 1:nrow(covid)
 
 eda_tree <- rpart(cases ~ .-date, data = covid, method = "anova")
-plot(eda_tree, uniform = F, margin = 0.05)
+plot(eda_tree, uniform = F, margin = 0.5)
 text(eda_tree, pretty = T)
 ```
 
 Initial inspection of this tree shows that there is clustering by date. Now we try other splits.
 
-```{r eda-tree2, echo = F, fig.height=3}
+```{r eda-tree2, echo = F, fig.height=3, fig.cap = "Regression tree to determine clusters in data not determined by time."}
 eda_tree2 <- rpart(cases ~ .-date-time, data = covid, method = "anova")
-plot(eda_tree2, uniform = F, margin = 0.05)
+plot(eda_tree2, uniform = F, margin = 0.5)
 text(eda_tree2, pretty = T)
 ```
 
-With the two splitting criteria, we can plot the predictors against cases again. The first set of plots are when the dataset is split by date.
+With the two splitting criteria, we can plot the predictors against cases again. The first set of plots in Figure \@ref(fig:plot-time-split) is when the dataset is split by date. The second set of plots in Figure \@ref(fig:plot-mask-split) is when the dataset is split by `mask_prop`.
 
-```{r plot-time-split, echo = F, fig.height=8}
+```{r plot-time-split, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts on and before July 25th, 2021."}
 par(mfrow=c(3,3))
 
 covid_ts <- covid[covid$time < 51.5, ]
@@ -114,12 +114,12 @@ with(covid_ts,plot(public_transit,cases))
 with(covid_ts,plot(resto_visit,cases))
 with(covid_ts,plot(worked_outside,cases))
 
-covid$date[covid$time == 51]
+#Determines point in time where data is split.
+#covid$date[covid$time == 51]
 ```
 
-The second set of plots is when the dataset is split by `mask_prop`.
 
-```{r plot-mask-split, echo = F, fig.height=8}
+```{r plot-mask-split, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts for dates such that `mask_prop` < 70.67 ."}
 par(mfrow=c(3,3))
 
 covid_ms <- covid[covid$mask_prop < 70.67, ]
@@ -134,9 +134,9 @@ with(covid_ms,plot(resto_visit,cases))
 with(covid_ms,plot(worked_outside,cases))
 ```
 
-It is clear that splitting by date reduces the clustering behavior so that trends are now much clearer. Hence the hypothesis that the correlation of predictors is due to the clustering is informally rejected. The dataset appears to be split into data points on or before, and after July 25th, 2021. For completeness, the plots against cases for the remaining cluster are presented.
+It is clear that splitting by date reduces the clustering behavior so that trends are now much clearer. Hence the hypothesis that the correlation of predictors is due to the clustering is informally rejected. The dataset appears to be split into data points on or before, and after July 25th, 2021. For completeness, the plots against cases for the remaining cluster are presented in Figure \@ref(fig:plot-time-split2). Interestingly, there does not seem to be trends forming for this cluster.
 
-```{r plot-time-split2, echo = F, fig.height=8}
+```{r plot-time-split2, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts after July 25th, 2021."}
 par(mfrow=c(3,3))
 
 covid_ts <- covid[covid$time >= 51.5, ]
@@ -150,7 +150,5 @@ with(covid_ts,plot(public_transit,cases))
 with(covid_ts,plot(resto_visit,cases))
 with(covid_ts,plot(worked_outside,cases))
 ```
-
-Interestingly, there does not seem to be trends forming for this cluster.
 
 Now, we will outline potential approaches to the analysis of this dataset. Given the clustering by date determined above, we perform the following proposed methods either for each cluster separately, or with time as an encoded categorical variable. Firstly, univariate linear models of each predictor against case counts will be examined to gain an initial understanding of how each predictor affects case counts, and a full linear model will be presented to see how the predictors fit together. Secondly, since it has been determined that the correlation of predictors is not due to the clusters in the dataset, a regularization approach will be employed. Most likely, LASSO will be used in order to enable the ranking of the impact of predictors, as it matches the goal of the analysis. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches. However, repeating the first two approaches with various transformations of the predictors is a possibility; this enables us to accurately model the dataset without sacrificing too much interpretability. Finally, once the research questions have been answered by the above two methods, we will attempt to see if the clusters can be characterized by the predictors instead of by date, which is a classification problem. We will decide the range of approaches to employ for this last component of the analysis once we have settled whether we want to interpret the characterization of the clusters or not.
