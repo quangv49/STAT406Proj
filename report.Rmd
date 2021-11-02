@@ -31,22 +31,32 @@ Now we will summarize our two objectives for this study:
 \item Identify a model which can be used to predict future COVID-19 case counts.
 \end{enumerate}
 
-## Explanatory data analysis
+## Exploratory data analysis
 
-We first examine the descriptive statistics of the response and all predictors. This is done by looking at their boxplots, as in Figure \@ref(fig:indiv_boxplots).
+We first examine the descriptive statistics of the response and all predictors. We present the mean and standard deviation of the predictors and case counts in Table \@ref(tab:desc-stat).
 
-```{r indiv_boxplots, echo=FALSE, fig.height=8, fig.cap = "Boxplots of individual predictors and COVID-19 case counts."}
+```{r desc-stat}
 covid <- read.table("pblc_bhv_covid.csv",sep = ',', header=TRUE)
+means <- sapply(subset(covid,select=-date), mean)
+sds <- sapply(subset(covid,select=-date), sd)
+desc <- data.frame(Mean = means, Standard.deviation = sds)
+
+knitr::kable(desc, digits = 2, caption = "Descriptive statistics of predictors and case counts.", format = "pipe")
+
+```
+
+It is clear that all variables have very different scales from each other, so models with unstandardized and standardized variables should be examined. However, these statistics do not inform of the distribution of predictors. To gain information about this, we look at boxplots of the predictors and case counts, as in Figure \@ref(fig:indiv-boxplots). We can see that the distributions of `distancing`, `bar_visit`, `other_mask_prop`, and `cases` are skewed to the right, while the distributions of the others are roughly symmetrical. This concludes our examination of individual variables.
+
+```{r indiv-boxplots, echo=FALSE, fig.height=8, fig.cap = "Boxplots of individual predictors and case counts."}
 par(mfrow=c(3,3))
 for (i in 2:10) {
   boxplot(covid[i], xlab=names(covid)[i], ylab="Values")
 }
 ```
-It is clear that all variables have very different scales from each other, so models with unstandardized and standardized variables should be examined. About the distribution of the variables, `distancing`, `bar_visit`, `other_mask_prop`, and `cases` are skewed to the right, while the others are roughly symmetrical.
 
-We plot all predictors against the number of cases in Figure \@ref(fig:plots_against_cases).
+Now, we will look at how predictors are related to case counts and each other. We plot all predictors against the number of cases in Figure \@ref(fig:plots-against-cases). `distancing`, `bar_visit` and `large_events` appear to have two clusters with different mean case counts. On the other hand, `mask_prop`, `other_mask_prop`, `resto_visit` and `worked_outside` appear to have two trend lines. `public_transit` also looks like there are two trend lines, but both are quite flat. This strongly suggests that there are two clusters within the data that exhibit different relationships between case counts and public behavior.
 
-```{r plots_against_cases, echo=FALSE, fig.height = 8, fig.cap = "Scatterplots of predictors against case counts."}
+```{r plots-against-cases, echo=FALSE, fig.height = 8, fig.cap = "Scatterplots of predictors against case counts."}
 
 par(mfrow=c(3,3))
 
@@ -59,8 +69,6 @@ with(covid,plot(public_transit,cases))
 with(covid,plot(resto_visit,cases))
 with(covid,plot(worked_outside,cases))
 ```
-
-`distancing`, `bar_visit` and `large_events` appear to have two clusters with different mean case counts. On the other hand, `mask_prop`, `other_mask_prop`, `resto_visit` and `worked_outside` appear to have two trend lines. `public_transit` also looks like there are two trend lines, but both are quite flat. This strongly suggests that there are two clusters within the data that exhibit different relationships between case counts and public behavior.
 
 To continue the examination of the dataset, we will now look at the covariance matrix of the predictors.
 
@@ -78,7 +86,7 @@ There is some substantial correlation between some predictors. In particular, `b
 
 Following the observed clustering behavior and the correlation of several predictors, a natural hypothesis to make is that the correlation of the variables is due to the clustering behavior. Of course, the validity of this hypothesis depends on whether the clusters are based on date (which is possible since COVID-19 spread is in waves) or based on the predictors themselves. Hence, we now try to identify how the clusters are split.
 
-To do this, we attempt to fit a regression tree and look at the split at the root. Please note that we are only using this tree to expedite the exploration rather than seriously considering as a model.
+To do this, we attempt to fit a regression tree and look at the split at the root. Please note that we are only using this tree to expedite the exploration rather than seriously considering as a model. The fitted tree is plotted in Figure \@ref(fig:eda-tree).
 
 ```{r eda-tree, echo = F, fig.height=3, fig.cap = "Regression tree to determine clusters in data."}
 library(rpart)
@@ -90,15 +98,7 @@ plot(eda_tree, uniform = F, margin = 0.5)
 text(eda_tree, pretty = T)
 ```
 
-Initial inspection of this tree shows that there is clustering by date. Now we try other splits.
-
-```{r eda-tree2, echo = F, fig.height=3, fig.cap = "Regression tree to determine clusters in data not determined by time."}
-eda_tree2 <- rpart(cases ~ .-date-time, data = covid, method = "anova")
-plot(eda_tree2, uniform = F, margin = 0.5)
-text(eda_tree2, pretty = T)
-```
-
-With the two splitting criteria, we can plot the predictors against cases again. The first set of plots in Figure \@ref(fig:plot-time-split) is when the dataset is split by date. The second set of plots in Figure \@ref(fig:plot-mask-split) is when the dataset is split by `mask_prop`.
+Initial inspection of this tree shows that there is clustering by date. The set of plots in Figure \@ref(fig:plot-time-split) corresponds to the first cluster of the dataset when it is split by date. It is clear that splitting by date reduces the clustering behavior so that trends are now much clearer. For completeness, the plots against cases for the remaining cluster are presented in Figure \@ref(fig:plot-time-split2). Interestingly, there does not seem to be trends forming for this cluster.
 
 ```{r plot-time-split, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts on and before July 25th, 2021."}
 par(mfrow=c(3,3))
@@ -118,24 +118,6 @@ with(covid_ts,plot(worked_outside,cases))
 #covid$date[covid$time == 51]
 ```
 
-
-```{r plot-mask-split, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts for dates such that `mask_prop` < 70.67 ."}
-par(mfrow=c(3,3))
-
-covid_ms <- covid[covid$mask_prop < 70.67, ]
-
-with(covid_ms,plot(distancing,cases))
-with(covid_ms,plot(bar_visit,cases))
-with(covid_ms,plot(large_events,cases))
-with(covid_ms,plot(mask_prop,cases))
-with(covid_ms,plot(other_mask_prop,cases))
-with(covid_ms,plot(public_transit,cases))
-with(covid_ms,plot(resto_visit,cases))
-with(covid_ms,plot(worked_outside,cases))
-```
-
-It is clear that splitting by date reduces the clustering behavior so that trends are now much clearer. Hence the hypothesis that the correlation of predictors is due to the clustering is informally rejected. The dataset appears to be split into data points on or before, and after July 25th, 2021. For completeness, the plots against cases for the remaining cluster are presented in Figure \@ref(fig:plot-time-split2). Interestingly, there does not seem to be trends forming for this cluster.
-
 ```{r plot-time-split2, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts after July 25th, 2021."}
 par(mfrow=c(3,3))
 
@@ -151,4 +133,29 @@ with(covid_ts,plot(resto_visit,cases))
 with(covid_ts,plot(worked_outside,cases))
 ```
 
-Now, we will outline potential approaches to the analysis of this dataset. Given the clustering by date determined above, we perform the following proposed methods either for each cluster separately, or with time as an encoded categorical variable. Firstly, univariate linear models of each predictor against case counts will be examined to gain an initial understanding of how each predictor affects case counts, and a full linear model will be presented to see how the predictors fit together. Secondly, since it has been determined that the correlation of predictors is not due to the clusters in the dataset, a regularization approach will be employed. Most likely, LASSO will be used in order to enable the ranking of the impact of predictors, as it matches the goal of the analysis. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches. However, repeating the first two approaches with various transformations of the predictors is a possibility; this enables us to accurately model the dataset without sacrificing too much interpretability. Finally, once the research questions have been answered by the above two methods, we will attempt to see if the clusters can be characterized by the predictors instead of by date, which is a classification problem. We will decide the range of approaches to employ for this last component of the analysis once we have settled whether we want to interpret the characterization of the clusters or not.
+Now we will examine if splitting into clusters reduces the correlation of predictors.
+
+```{r corr_split, fig.cap = "Entries of correlation matrix with high coefficients for points on and before July 25th 2021."}
+predictors_ts <- subset(covid_ts, select=-c(cases,date))
+
+cor_pred_ts <- cor(as.matrix(predictors_ts))
+
+for (i in 1:ncol(predictors_ts)) {
+  print(cor_pred_ts[i, abs(cor_pred_ts[i,]) > 0.6])
+}
+```
+
+It appears that splitting into clusters has made the correlation between predictors worse. This means that the correlation of predictors is not due to the clusters. However, the trends are clearer when clusters are made, so we will keep this approach; a regularization method will become useful as a result. Noting the large coefficients of `time` in the correlation matrix, it appears that public behavior changes over time, most likely in reaction to the changes in case counts over the months. We will see if this is still true in the entire dataset.
+
+```{r corr_whole_after_ts, fig.cap = "Entries of correlation matrix with high coefficients with `time` included."}
+predictors <- subset(covid, select=-c(cases,date))
+
+cor_pred <- cor(as.matrix(predictors))
+
+for (i in 1:ncol(predictors)) {
+  print(cor_pred[i, abs(cor_pred[i,]) > 0.6])
+}
+```
+It seems that time is less important in the entire dataset, even though direct inspection reveals that the correlation coefficients of predictors against time are still relatively high. For this reason, we will analyze the dataset as a whole and in clusters by time.
+
+Now, we will outline potential approaches to the analysis of this dataset. As mentioned above, we will analyze the entire dataset as one, and then repeat when the dataset is divided into clusters or with time as an encoded categorical variable instead. Firstly, univariate linear models of each predictor against case counts will be examined to gain an initial understanding of how each predictor affects case counts, and a full linear model will be presented to see how the predictors fit together. Secondly, a regularization approach will be employed due to the correlation of many predictors. Most likely, LASSO will be used in order to enable the ranking of the impact of predictors, as it matches the goal of the analysis. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches. However, repeating the first two approaches with various transformations of the predictors is a possibility; this enables us to accurately model the dataset without sacrificing too much interpretability. Finally, once the main questions have been answered by the above two methods, we will attempt to see if the clusters can be characterized by the predictors instead of by date, which is a classification problem. We will decide the range of approaches to employ for this last component of the analysis once we have settled whether we want to interpret the characterization of the clusters or not.
