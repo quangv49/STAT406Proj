@@ -156,3 +156,18 @@ for (i in 1:ncol(predictors)) {
 ```
 
 Now, we will outline potential approaches to the analysis of this dataset. As mentioned above, we will analyze the entire dataset as one, and then repeat when the dataset is divided into clusters or with time as an encoded categorical variable instead. Firstly, univariate linear models of each predictor against case counts will be examined to gain an initial understanding of how each predictor affects case counts, and a full linear model will be presented to see how the predictors fit together. Secondly, a regularization approach will be employed due to the correlation of many predictors. Most likely, LASSO will be used in order to enable the ranking of the impact of predictors, as it matches the goal of the analysis. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches. However, repeating the first two approaches with various transformations of the predictors is a possibility; this enables us to accurately model the dataset without sacrificing too much interpretability. Finally, once the main questions have been answered by the above two methods, we will attempt to see if the clusters can be characterized by the predictors instead of by date, which is a classification problem. We will decide the range of approaches to employ for this last component of the analysis once we have settled whether we want to interpret the characterization of the clusters or not.
+
+## Analysis
+
+```{r univ-fit}
+library(glmnet)
+full_mod <- lm(cases ~ .-date-time, data = covid)
+summary(full_mod)
+
+cv <- sum(full_mod$residuals^2/(1-diag(hatvalues(full_mod))^2))
+
+full_mod1 <- lm(cases~.-date-time, data = covid_ts)
+summary(full_mod1)
+
+```
+
