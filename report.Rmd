@@ -103,16 +103,16 @@ Initial inspection of this tree shows that there is clustering by date. The set 
 ```{r plot-time-split, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts on and before July 25th, 2021."}
 par(mfrow=c(3,3))
 
-covid_ts <- covid[covid$time < 51.5, ]
+covid_ts1 <- covid[covid$time < 51.5, ]
 
-with(covid_ts,plot(distancing,cases))
-with(covid_ts,plot(bar_visit,cases))
-with(covid_ts,plot(large_events,cases))
-with(covid_ts,plot(mask_prop,cases))
-with(covid_ts,plot(other_mask_prop,cases))
-with(covid_ts,plot(public_transit,cases))
-with(covid_ts,plot(resto_visit,cases))
-with(covid_ts,plot(worked_outside,cases))
+with(covid_ts1,plot(distancing,cases))
+with(covid_ts1,plot(bar_visit,cases))
+with(covid_ts1,plot(large_events,cases))
+with(covid_ts1,plot(mask_prop,cases))
+with(covid_ts1,plot(other_mask_prop,cases))
+with(covid_ts1,plot(public_transit,cases))
+with(covid_ts1,plot(resto_visit,cases))
+with(covid_ts1,plot(worked_outside,cases))
 
 #Determines point in time where data is split.
 #covid$date[covid$time == 51]
@@ -121,16 +121,16 @@ with(covid_ts,plot(worked_outside,cases))
 ```{r plot-time-split2, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts after July 25th, 2021."}
 par(mfrow=c(3,3))
 
-covid_ts <- covid[covid$time >= 51.5, ]
+covid_ts2 <- covid[covid$time >= 51.5, ]
 
-with(covid_ts,plot(distancing,cases))
-with(covid_ts,plot(bar_visit,cases))
-with(covid_ts,plot(large_events,cases))
-with(covid_ts,plot(mask_prop,cases))
-with(covid_ts,plot(other_mask_prop,cases))
-with(covid_ts,plot(public_transit,cases))
-with(covid_ts,plot(resto_visit,cases))
-with(covid_ts,plot(worked_outside,cases))
+with(covid_ts2,plot(distancing,cases))
+with(covid_ts2,plot(bar_visit,cases))
+with(covid_ts2,plot(large_events,cases))
+with(covid_ts2,plot(mask_prop,cases))
+with(covid_ts2,plot(other_mask_prop,cases))
+with(covid_ts2,plot(public_transit,cases))
+with(covid_ts2,plot(resto_visit,cases))
+with(covid_ts2,plot(worked_outside,cases))
 ```
 
 When checking the correlation matrices within the first cluster, it appears that splitting into clusters has made the correlation between predictors worse. However, the trends are clearer when clusters are made, so we will keep this approach; a regularization method will become useful as a result. The coefficients of `time` in the correlation matrix are large, so it appears that public behavior changes over time, most likely in reaction to the changes in case counts over the months. This is still visible in the correlation matrix of the whole dataset with `time` included, as its coefficients are still relatively high. For this reason, we will analyze the dataset as a whole and in clusters by time.
@@ -159,15 +159,48 @@ Now, we will outline potential approaches to the analysis of this dataset. As me
 
 ## Analysis
 
-```{r univ-fit}
+```{r full}
 library(glmnet)
+library(tidyverse)
+library(MASS)
 full_mod <- lm(cases ~ .-date-time, data = covid)
 summary(full_mod)
 
-cv <- sum(full_mod$residuals^2/(1-diag(hatvalues(full_mod))^2))
+cv_fullmod <- mean(full_mod$residuals^2/(1-diag(hatvalues(full_mod)))^2)
+cv_fullmod
+```
 
-full_mod1 <- lm(cases~.-date-time, data = covid_ts)
+```{r full-by-time}
+covid <- covid %>% mutate(ts = as.factor(time >= 51.5))
+
+full_mod1 <- lm(cases ~ ts*(.-date-time), data = covid)
 summary(full_mod1)
 
+cv_fullmod1 <- mean(full_mod1$residuals^2/(1-diag(hatvalues(full_mod1)))^2)
+
+cv_fullmod1
+```
+
+```{r lasso}
+lasso_mod <- cv.glmnet(x = matrix(unlist(covid[,2:9]), nrow = nrow(covid)),
+                       y = covid$cases)
+
+lasso_mod$cvm[lasso_mod$lambda == lasso_mod$lambda.min]
+
+coef(lasso_mod$glmnet.fit, s = lasso_mod$lambda.min)
+```
+
+```{r lasso-by-time}
+lasso_mod1 <- cv.glmnet(x = matrix(unlist(covid[,c(2:9,12)]), nrow = nrow(covid)),
+                       y = covid$cases)
+
+lasso_mod1$cvm[lasso_mod1$lambda == lasso_mod1$lambda.min]
+
+coef(lasso_mod1$glmnet.fit, s = lasso_mod$lambda.min)
+```
+```{r stepwise-with-time}
+forsel_mod <- stepAIC(full_mod1, cases ~ ts*(.-date-time-ts), direction = "forward")
+
+summary(forsel_mod)
 ```
 
