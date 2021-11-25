@@ -159,6 +159,8 @@ Now, we will outline potential approaches to the analysis of this dataset. As me
 
 ## Analysis
 
+Models will be selected by leave-one-out CV score using mean squared error.
+
 ```{r full}
 library(glmnet)
 library(tidyverse)
@@ -169,7 +171,7 @@ summary(full_mod)
 cv_fullmod <- mean(full_mod$residuals^2/(1-diag(hatvalues(full_mod)))^2)
 cv_fullmod
 ```
-
+The first model fitted is a full model that does not split by time. Its CV scores is 3594.374.
 ```{r full-by-time}
 covid <- covid %>% mutate(ts = as.factor(time >= 51.5))
 
@@ -180,7 +182,7 @@ cv_fullmod1 <- mean(full_mod1$residuals^2/(1-diag(hatvalues(full_mod1)))^2)
 
 cv_fullmod1
 ```
-
+The second model fitted is a full model that fits different models depending on the identified clusters by time. Its CV score is 651.5509, which is much better than the first full model.
 ```{r lasso}
 lasso_mod <- cv.glmnet(x = matrix(unlist(covid[,2:9]), nrow = nrow(covid)),
                        y = covid$cases)
@@ -198,9 +200,30 @@ lasso_mod1$cvm[lasso_mod1$lambda == lasso_mod1$lambda.min]
 
 coef(lasso_mod1$glmnet.fit, s = lasso_mod$lambda.min)
 ```
+The next two models are fitted using LASSO. The first of them does not split by time, while the second does. These models have larger CV scores than the unregularized models, indicating that it is likely that all social behavior indicators are important in predicting case counts. Hence it is sensible to attempt ridge regression now.
+
+```{r ridge}
+ridge_mod <- cv.glmnet(x = matrix(unlist(covid[,2:9]), nrow = nrow(covid)),
+                       y = covid$cases, alpha = 0)
+
+ridge_mod$cvm[ridge_mod$lambda == ridge_mod$lambda.min]
+
+coef(ridge_mod$glmnet.fit, s = ridge_mod$lambda.min)
+```
+
+```{r ridge-by-time}
+ridge_mod1 <- cv.glmnet(x = matrix(unlist(covid[,2:9,12]), nrow = nrow(covid)),
+                       y = covid$cases, alpha = 0)
+
+ridge_mod1$cvm[ridge_mod1$lambda == ridge_mod1$lambda.min]
+
+coef(ridge_mod1$glmnet.fit, s = ridge_mod1$lambda.min)
+```
+The models fitted by ridge regression performed worse, so the most preferred models are still the full models. We now attempt stepwise variable selection on the full model that recognizes the time split.
+
 ```{r stepwise-with-time}
-forsel_mod <- stepAIC(full_mod1, cases ~ ts*(.-date-time-ts), direction = "forward")
+forsel_mod <- stepAIC(full_mod1, list(lower = cases ~ 0, upper = cases ~ ts*(.-date-time-ts)), direction = "both")
 
 summary(forsel_mod)
 ```
-
+The stepwise selection procedure ended up selecting a model which omits `resto_visit` as well as interaction terms of the time split with `bar_visit`, `large_events` and `worked_outside`. To correctly assess the quality of this model, we must perform a more elaborate CV procedure.
