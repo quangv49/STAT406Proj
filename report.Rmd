@@ -4,11 +4,14 @@ author: "Quang Vuong"
 output: bookdown::pdf_document2
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message = F}
 knitr::opts_chunk$set(echo = F)
+library(glmnet)
+library(tidyverse)
+library(MASS)
+set.seed(20211127)
+covid <- read.table("pblc_bhv_covid.csv",sep = ',', header=TRUE)
 ```
-
-I am interested in the present dataset because of many reasons. Most importantly, I would like to work in public health in the future, so this project seems like a good starting point. Furthermore, it is shown in the news that there are aspects of public behavior, such as mask-wearing and social distancing, which are more important in controlling the spread of COVID-19 than others, so I wonder if we can quantify this exactly.
 
 ## Introduction
 
@@ -33,12 +36,11 @@ Now we will summarize our two objectives for this study:
 \item Identify a model which can be used to predict future COVID-19 case counts.
 \end{enumerate}
 
+Tupper et al. (2020) analyzed a model of COVID-19 transmission based on the specifics of social behavior such as reducing transmission rates through masks, social distancing and "bubbling", i.e. limiting social contact. They have concluded that distancing is the most powerful method to reduce transmission, while the effects of masking and bubbling are more situational but still significant. Therefore, based on this study, we would directly expect that `distancing`, `mask_prop` and `other_mask_prop` are important variables that predict lower COVID-19 case counts when at higher levels. It is feasible that the other predictors are important in predicting higher COVID-19 case counts when at higher levels as well, since an argument can be made that they do not pertain to bubbling. We then hypothesize that all predictors will appear in the final selected model.
+
 ## Exploratory data analysis
 
-We first examine the descriptive statistics of the response and all predictors. We present the mean and standard deviation of the predictors and case counts in Table \@ref(tab:desc-stat). The units are as described in the introduction.
-
-```{r desc-stat}
-covid <- read.table("pblc_bhv_covid.csv",sep = ',', header=TRUE)
+```{r desc-stat, eval = F}
 means <- sapply(subset(covid,select=-date), mean)
 sds <- sapply(subset(covid,select=-date), sd)
 desc <- data.frame(Mean = means, Standard.deviation = sds)
@@ -47,16 +49,13 @@ knitr::kable(desc, digits = 2, caption = "Descriptive statistics of predictors a
 
 ```
 
-It is clear that all variables have very different scales from each other, so models with unstandardized and standardized variables should be examined. However, these statistics do not inform of the distribution of predictors. To gain information about this, we look at boxplots of the predictors and case counts, as in Figure \@ref(fig:indiv-boxplots). We can see that the distributions of `distancing`, `bar_visit`, `other_mask_prop`, and `cases` are skewed to the right, while the distributions of the others are roughly symmetrical. This concludes our examination of individual variables.
-
-```{r indiv-boxplots, echo=FALSE, fig.height=8, fig.cap = "Boxplots of individual predictors and case counts."}
+```{r indiv-boxplots, echo=FALSE, fig.height=8, fig.cap = "Boxplots of individual predictors and case counts.", eval = F}
 par(mfrow=c(3,3))
 for (i in 2:10) {
   boxplot(covid[i], xlab=names(covid)[i], ylab="Values")
 }
 ```
-
-Now, we will look at how predictors are related to case counts and each other. We plot all predictors against the number of cases in Figure \@ref(fig:plots-against-cases). `distancing`, `bar_visit` and `large_events` appear to have two clusters with different mean case counts. On the other hand, `mask_prop`, `other_mask_prop`, `resto_visit` and `worked_outside` appear to have two trend lines. `public_transit` also looks like there are two trend lines, but both are quite flat. This strongly suggests that there are two clusters within the data that exhibit different relationships between case counts and public behavior.
+It is the most instructive to first look at how predictors are related to case counts and each other. We plot all predictors against the number of cases in Figure \@ref(fig:plots-against-cases). `distancing`, `bar_visit` and `large_events` appear to have two clusters with different mean case counts. On the other hand, `mask_prop`, `other_mask_prop`, `resto_visit` and `worked_outside` appear to have two trend lines. `public_transit` also looks like there are two trend lines, but both are quite flat. This strongly suggests that there are two clusters within the data that exhibit different relationships between case counts and public behavior.
 
 ```{r plots-against-cases, echo=FALSE, fig.height = 8, fig.cap = "Scatterplots of predictors against case counts."}
 
@@ -86,7 +85,7 @@ for (i in 1:ncol(predictors)) {
 
 There is some substantial correlation between some predictors. In particular, `bar_visit`, `mask_prop`, `large_events` and `other_mask_prop` seem correlated with each other. Of these predictors, `large_events` appear to have two clusters with different mean case counts, while the remaining predictors seem to have two trend lines against case counts.
 
-The most striking observation made so far is that there might be two clusters within the data that shows different relations between case counts and public behavior indicators, so we will now try to identify how the clusters are split. To do this, we attempt to fit a regression tree and look at the split at the root. Please note that we are only using this tree to expedite the exploration rather than seriously considering as a model. The fitted tree is plotted in Figure \@ref(fig:eda-tree).
+The most striking observation made so far is that there might be two clusters within the data that shows different relations between case counts and public behavior indicators, so we will now try to identify how the clusters are split. To do this, we attempt to fit a regression tree and look at the split at the root. Please note that we are only using this tree to expedite the exploration rather than seriously considering as a model. The fitted tree is plotted in Figure \@ref(fig:eda-tree). Initial inspection of this tree shows that there is clustering by date. After inspecting the plots of the predictors against `cases` within each cluster identified by the treem, it appears that splitting by date reduces the clustering behavior so that trends are now much clearer.
 
 ```{r eda-tree, echo = F, fig.height=3, fig.cap = "Regression tree to determine clusters in data."}
 library(rpart)
@@ -98,9 +97,9 @@ plot(eda_tree, uniform = F, margin = 0.5)
 text(eda_tree, pretty = T)
 ```
 
-Initial inspection of this tree shows that there is clustering by date. The set of plots in Figure \@ref(fig:plot-time-split) corresponds to the first cluster of the dataset when it is split by date. It is clear that splitting by date reduces the clustering behavior so that trends are now much clearer. For completeness, the plots against cases for the remaining cluster are presented in Figure \@ref(fig:plot-time-split2). Interestingly, there does not seem to be trends forming for this cluster.
 
-```{r plot-time-split, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts on and before July 25th, 2021."}
+
+```{r plot-time-split, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts on and before July 25th, 2021.", eval = F}
 par(mfrow=c(3,3))
 
 covid_ts1 <- covid[covid$time < 51.5, ]
@@ -118,7 +117,7 @@ with(covid_ts1,plot(worked_outside,cases))
 #covid$date[covid$time == 51]
 ```
 
-```{r plot-time-split2, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts after July 25th, 2021."}
+```{r plot-time-split2, echo = F, fig.height=8, fig.cap = "Scatterplots of predictors against case counts after July 25th, 2021.", eval = F}
 par(mfrow=c(3,3))
 
 covid_ts2 <- covid[covid$time >= 51.5, ]
@@ -133,10 +132,8 @@ with(covid_ts2,plot(resto_visit,cases))
 with(covid_ts2,plot(worked_outside,cases))
 ```
 
-When checking the correlation matrices within the first cluster, it appears that splitting into clusters has made the correlation between predictors worse. However, the trends are clearer when clusters are made, so we will keep this approach; a regularization method will become useful as a result. The coefficients of `time` in the correlation matrix are large, so it appears that public behavior changes over time, most likely in reaction to the changes in case counts over the months. This is still visible in the correlation matrix of the whole dataset with `time` included, as its coefficients are still relatively high. For this reason, we will analyze the dataset as a whole and in clusters by time.
-
 ```{r corr_split, fig.cap = "Entries of correlation matrix with high coefficients for points on and before July 25th 2021.", eval = F}
-predictors_ts <- subset(covid_ts, select=-c(cases,date))
+predictors_ts <- subset(covid_ts1, select=-c(cases,date))
 
 cor_pred_ts <- cor(as.matrix(predictors_ts))
 
@@ -155,40 +152,126 @@ for (i in 1:ncol(predictors)) {
 }
 ```
 
-Now, we will outline potential approaches to the analysis of this dataset. As mentioned above, we will analyze the entire dataset as one, and then repeat when the dataset is divided into clusters or with time as an encoded categorical variable instead. Firstly, univariate linear models of each predictor against case counts will be examined to gain an initial understanding of how each predictor affects case counts, and a full linear model will be presented to see how the predictors fit together. Secondly, a regularization approach will be employed due to the correlation of many predictors. Most likely, LASSO will be used in order to enable the ranking of the impact of predictors, as it matches the goal of the analysis. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches. However, repeating the first two approaches with various transformations of the predictors is a possibility; this enables us to accurately model the dataset without sacrificing too much interpretability. Finally, once the main questions have been answered by the above two methods, we will attempt to see if the clusters can be characterized by the predictors instead of by date, which is a classification problem. We will decide the range of approaches to employ for this last component of the analysis once we have settled whether we want to interpret the characterization of the clusters or not.
+Now, we will outline potential approaches to the analysis of this dataset. As mentioned above, we will analyze the both the original dataset and the dataset with time as an encoded categorical variable instead. Firstly, univariate linear models of each predictor against case counts will be examined to gain an initial understanding of how each predictor affects case counts, and a full linear model will be presented to see how the predictors fit together. Secondly, a regularization approach will be employed due to the correlation of many predictors. Most likely, LASSO will be used in order to enable the ranking of the impact of predictors, as it matches the goal of the analysis. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches. However, repeating the first two approaches with various transformations of the predictors is a possibility; this enables us to accurately model the dataset without sacrificing too much interpretability. Finally, once the main questions have been answered by the above two methods, we will attempt to see if the clusters can be characterized by the predictors instead of by date, which is a classification problem. We will decide the range of approaches to employ for this last component of the analysis once we have settled whether we want to interpret the characterization of the clusters or not.
 
-## Analysis
+## Analysis and results
 
-Models will be selected by leave-one-out CV score using mean squared error.
+We will first perform statistical analysis procedures on the data in this section, and then interpret the results.
+
+We first look at univariate models of the predictors against `cases` without recognizing the time split. We posit that for each predictor \(x\), the random variable representing `cases`, \(Y\), has the form
+\[Y = \beta_0 + \beta_1 x + \varepsilon\]
+where \(\varepsilon\) is normally distributed with mean \(0\) and variance \(\sigma^2\). Obtaining least squares estimates of \(\beta_0\) and \(\beta_1\) for each predictor yields the following table, which also displays the \(p\)-values calculated for the hypothesis test \(H_0: \beta_1 = 0\) against \(H_a : \beta_1 \neq 0\) using the \(t\)-statistic as the test statistic.
+
+```{r univ}
+models <- matrix(double(24),ncol=3)
+for (i in 1:8) {
+  univ_model <- lm(cases ~ covid[,i+1], data = covid)
+  models[i,1] <- coef(univ_model)[1]
+  models[i,2] <- coef(univ_model)[2]
+  models[i,3] <- summary(univ_model)$coefficients[2,4]
+}
+
+univ <- data.frame(Predictors = c("distancing","bar_visit","large_events",
+                                  "mask_prop","other_mask_prop","public_transit",
+                                  "resto_visit", "worked_outside"),
+                   Intercept = models[,1],
+                   Coefficient = models[,2],
+                   p.value.of.coeff = models[,3])
+
+names(univ)[4] <- "p value of coefficient"
+
+knitr::kable(univ, digits = 4)
+```
+
+According to the \(p\)-values, `distancing`, `bar_visit`, `large_events`, `mask_prop`, `public_transit`, `resto_visit` and `worked_outside` have significant individual linear relationship with `cases` at the \(5\%\) significant level. It appears that `cases` increases when `distancing`, `bar_visit`, `public_transit` and `resto_visit` decrease and when `large_events`, `mask_prop` and `worked_outside` increase. Since we have remarked that there are likely to be two clusters in the data exhibiting different relationships between case counts and the predictors, the analysis must now account for the time split. We posit that for each predictor \(x\), the random variable representing `cases`, \(Y\), has the form
+\[Y = \beta_0 + \beta_1 x + \beta_2 t + \beta_3 tx + \varepsilon\]
+where \(\varepsilon\) is normally distributed with mean \(0\) and variance \(\sigma^2\), and \(t = 0\) if the observation is before and on July 25th, 2021 and \(1\) otherwise. Obtaining least squares estimates of \(\beta_0\) and \(\beta_1\) for each predictor yields the following table, which also displays the \(p\)-values calculated for the hypothesis tests \(H_0: \beta_1 = 0\) against \(H_a : \beta_1 \neq 0\) and \(H_0: \beta_3 = 0\) against \(H_a : \beta_3 \neq 0\), both using the \(t\)-statistic as the test statistic.
+
+```{r univ-by-time}
+covid <- covid %>% mutate(ts = as.factor(time >= 51.5))
+models <- matrix(double(48),ncol=6)
+for (i in 1:8) {
+  univ_model <- lm(cases ~ ts*covid[,i+1], data = covid)
+  models[i,1] <- coef(univ_model)[1]
+  models[i,2] <- coef(univ_model)[3]
+  models[i,3] <- models[i,1] + coef(univ_model)[2]
+  models[i,4] <- models[i,2] + coef(univ_model)[4]
+  models[i,5] <- summary(univ_model)$coefficients[2,4]
+  models[i,6] <- summary(univ_model)$coefficients[4,4]
+}
+
+univ <- data.frame(Predictors = c("distancing","bar_visit","large_events",
+                                  "mask_prop","other_mask_prop","public_transit",
+                                  "resto_visit", "worked_outside"),
+                   int.before = models[,1],
+                   coeff.before = models[,2],
+                   int.after = models[,3],
+                   coeff.after = models[,4],
+                   p.value.of.coeff1 = models[,5],
+                   p.value.of.coeff2 = models[,6])
+
+names(univ)[2:7] <- c("Intrcpt before split", "Coeff before split", "Intrcpt after split", "Coeff after split","p value of b1", "p value of b3")
+
+knitr::kable(univ)
+```
+
+After accounting for the time split, all predictors have significant individual relationships with `cases` at the \(5\%\) significant level. Only `mask_prop`, `other_mask_prop` and `resto_visit` have significantly different mathematical relationships with `cases` after the time split at the \(5\%\) significant level. Before the split point, `cases` increases when `distancing`, `mask_prop`, `other_mask_prop` and `public_transit` decrease and when the other predictors increase. After the split point, `cases` increases when `mask_prop` and `other_mask_prop` increase and when `public_transit` decreases, although to a lesser extent.
+
+The analysis so far has allowed us to answer the first objective of the study, but it focuses on one predictor at a time and assumes that the others are unrelated to `cases`. While it is useful for an initial inspection, it is seriously limited, so we must turn to a full linear model. Using the same notation for `cases` and denoting `distancing`, `bar_visit`,`large_events`,`mask_prop`,`other_mask_prop`,`public_transit`, `resto_visit`, and `worked_outside` as \(x_1,...,x_8\), we posit the model
+\[Y = \beta_0 + \sum_{i=1}^8 \beta_ix_i + \varepsilon\]
+where \(\varepsilon\) is normally distributed with mean \(0\) and standard deviation \(\sigma^2\). The output of a least squares estimation procedure on the data with this model is as follows.
 
 ```{r full}
-library(glmnet)
-library(tidyverse)
-library(MASS)
-full_mod <- lm(cases ~ .-date-time, data = covid)
+full_mod <- lm(cases ~ .-date-time-ts, data = covid)
+print("Summary of full model, no time split")
 summary(full_mod)
-
-cv_fullmod <- mean(full_mod$residuals^2/(1-diag(hatvalues(full_mod)))^2)
-cv_fullmod
 ```
-The first model fitted is a full model that does not split by time. Its CV scores is 3594.374.
-```{r full-by-time}
-covid <- covid %>% mutate(ts = as.factor(time >= 51.5))
+At the \(5\%\) significant level, only `distancing`, `bar_visit`, `mask_prop`, `other_mask_prop` and `public_transit` have an association with `cases`. We delay the interpretation of this model since this task requires us to assume that some predictors are "held constant", which is not a realistic situation. Now, the existence of the time split requires us to posit the model, with the same notation,
 
+\[Y = \beta_0 + \beta_1 t + \sum_{i=1}^8 \beta_{i+1}x_i + \sum_{i=1}^8 \beta_{i+9} tx_i + \varepsilon\]
+
+where \(\varepsilon\) is as before and \(t = 0\) if the observation is on or before July 25th, 2021 and \(1\) otherwise. The output of a least squares estimation procedure on the data for this model is shown below.
+
+```{r full-by-time}
 full_mod1 <- lm(cases ~ ts*(.-date-time), data = covid)
+print("Summary of full model with time split")
 summary(full_mod1)
+```
+At the \(5\%\) significant level, only `large_events` and `other_mask_prop` have significant relationships with `cases` at all times, while `distancing`, `mask_prop` and `public_transit` are only significantly related to `cases` after the split point. Even though it appears that the main effect of the latter variables are insignificant, \(t\) is used to express the clusters in the data where there might be different relationships between `cases` and the predictors, so the conclusions made are sound. For the same reason as above, we refrain from interpreting this model for now.
+
+Currently, for the first objective of the study, we have several competing models which provide different answers to the question of which predictors are significantly associated with `cases`. The assumptions of the univariate models are too restrictive compared to the full models, so we can discard the former. Now we can check if the error assumptions hold for the two full models.
+
+```{r res-plots}
+par(mfrow=c(2,2))
+plot(full_mod, 1)
+plot(full_mod, 2)
+plot(full_mod1, 1)
+plot(full_mod1, 2)
+```
+
+The full model that ignores the time split has a residual plot that has a very apparent line for observations with lower predicted cases, but it has a QQ plot which suggests only a small violation of the normal errors assumption. The full model that recognizes the time split has a more patternless residual plot, but there seems to be some heterocedasticity as well as a line on the left. The QQ plot for this model suggests a stronger violation of the normal errors assumption than the first model, but it is still minor. Therefore, we prefer the model that recognizes the time split for the first objective.
+
+So far, we have pursued the first objective from an inferential standpoint, which slightly deviates from the objective as stated. We will now assume a predictive standpoint and then weigh them in the Discussion section. The CV scores of the previous two full models are as follows. It is clear that the model that recognizes the time split performs much better.
+
+```{r cv-full}
+cv_fullmod <- mean(full_mod$residuals^2/(1-diag(hatvalues(full_mod)))^2)
+print("CV score of full model, no time split")
+cv_fullmod
 
 cv_fullmod1 <- mean(full_mod1$residuals^2/(1-diag(hatvalues(full_mod1)))^2)
-
+print("CV score of full model with time split")
 cv_fullmod1
 ```
-The second model fitted is a full model that fits different models depending on the identified clusters by time. Its CV score is 651.5509, which is much better than the first full model.
+Next, we will attempt regularization approaches. The two models are fitted again using LASSO. The first of them does not split recognize the time split, while the second does. These models have larger CV scores than the unregularized models, indicating that it is likely that all social behavior indicators are important in predicting case counts and informing that a ridge regression procedure might be helpful. However, the latter point does not seem to be the case. The outputs of the `R` code that fits these models are shown below.
+
 ```{r lasso}
 lasso_mod <- cv.glmnet(x = matrix(unlist(covid[,2:9]), nrow = nrow(covid)),
                        y = covid$cases)
 
+print("CV score of LASSO model, no time split")
 lasso_mod$cvm[lasso_mod$lambda == lasso_mod$lambda.min]
 
+print("Coefficients of LASSO model, no time split")
 coef(lasso_mod$glmnet.fit, s = lasso_mod$lambda.min)
 ```
 
@@ -196,34 +279,69 @@ coef(lasso_mod$glmnet.fit, s = lasso_mod$lambda.min)
 lasso_mod1 <- cv.glmnet(x = matrix(unlist(covid[,c(2:9,12)]), nrow = nrow(covid)),
                        y = covid$cases)
 
+print("CV score of LASSO model with time split")
 lasso_mod1$cvm[lasso_mod1$lambda == lasso_mod1$lambda.min]
 
+print("Coefficients of LASSO model with time split")
 coef(lasso_mod1$glmnet.fit, s = lasso_mod$lambda.min)
 ```
-The next two models are fitted using LASSO. The first of them does not split by time, while the second does. These models have larger CV scores than the unregularized models, indicating that it is likely that all social behavior indicators are important in predicting case counts. Hence it is sensible to attempt ridge regression now.
 
 ```{r ridge}
 ridge_mod <- cv.glmnet(x = matrix(unlist(covid[,2:9]), nrow = nrow(covid)),
                        y = covid$cases, alpha = 0)
 
+print("CV score of ridge model, no time split")
 ridge_mod$cvm[ridge_mod$lambda == ridge_mod$lambda.min]
 
+print("Coefficients of ridge model, no time split")
 coef(ridge_mod$glmnet.fit, s = ridge_mod$lambda.min)
 ```
 
 ```{r ridge-by-time}
-ridge_mod1 <- cv.glmnet(x = matrix(unlist(covid[,2:9,12]), nrow = nrow(covid)),
+ridge_mod1 <- cv.glmnet(x = matrix(unlist(covid[,c(2:9,12)]), nrow = nrow(covid)),
                        y = covid$cases, alpha = 0)
 
+print("CV score of ridge model with time split")
 ridge_mod1$cvm[ridge_mod1$lambda == ridge_mod1$lambda.min]
 
+print("Coefficient of ridge model with time split")
 coef(ridge_mod1$glmnet.fit, s = ridge_mod1$lambda.min)
 ```
-The models fitted by ridge regression performed worse, so the most preferred models are still the full models. We now attempt stepwise variable selection on the full model that recognizes the time split.
+Seeing that both regularization approaches performed worse than the full model, we now attempt stepwise variable selection on the full model that recognizes the time split.
 
 ```{r stepwise-with-time}
-forsel_mod <- stepAIC(full_mod1, list(lower = cases ~ 0, upper = cases ~ ts*(.-date-time-ts)), direction = "both")
+null <- lm(cases ~ 1, data = covid)
+forsel_mod <- stepAIC(null , list(lower = null, upper = full_mod1), direction = "both", trace = 0)
 
+print("Summary of stepwise selected model with time split")
 summary(forsel_mod)
 ```
-The stepwise selection procedure ended up selecting a model which omits `resto_visit` as well as interaction terms of the time split with `bar_visit`, `large_events` and `worked_outside`. To correctly assess the quality of this model, we must perform a more elaborate CV procedure.
+The stepwise selection procedure ended up selecting a model which omits `resto_visit` and `public_transit` as well as interaction terms of the time split with `bar_visit`, and `large_events` whil keeping the time split. To correctly assess the quality of this model, we must perform a more elaborate CV procedure.
+
+```{r stepwise-by-time}
+errors <- double(nrow(covid))
+for (i in 1:nrow(covid)) {
+  train <- covid[-i, ]
+  test <- covid[i, ]
+  null_train <- lm(cases ~ 1, data = train)
+  full_train <- lm(cases ~ ts*(.-date-time-ts), data = train)
+  mod.train <- stepAIC(null_train, list(lower = null_train, upper = full_train), direction = "both", trace = 0)
+  errors[i] <- (predict(mod.train,test) - test$cases)^2
+}
+print("CV score of stepwise-selected model with time split")
+mean(errors)
+```
+This leave-one-out CV routine reveals that the stepwise selection procedure gives a model with a CV score that is worse than the full model that recognizes the time split, so the preferred model is still the latter.
+
+```{r just-checking, eval = F}
+errors <- double(nrow(covid))
+for (i in 1:nrow(covid)) {
+  train <- covid[-i, ]
+  test <- covid[i, ]
+  full_train <- lm(cases ~ ts*(.-time-ts), data = train[,-1])
+  errors[i] <- (predict(full_train,test) - test$cases)^2
+}
+print("CV score of stepwise-selected model with time split")
+mean(errors)
+```
+
