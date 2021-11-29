@@ -1,5 +1,5 @@
 ---
-title: "How does public behavior affect the spread of COVID-19? - Initial report"
+title: "How does public behavior affect the spread of COVID-19?"
 author: "Quang Vuong"
 output: bookdown::pdf_document2
 ---
@@ -13,7 +13,7 @@ set.seed(20211127)
 covid <- read.table("pblc_bhv_covid.csv",sep = ',', header=TRUE)
 ```
 
-## Introduction
+# Introduction
 
 We wish to investigate how public behavior affects the spread of COVID-19 within a community. In particular, our goal is to identify which aspects of public behavior, such as visiting restaurants, visiting bars and using public transit, predict case counts. Since many other factors including population demographics, population density and policy decisions also affect the spread of COVID-19, it is best to focus on datasets for a sufficiently small geographical area (like a city or a county) so that the confounding factors unrelated to the study are controlled.
 
@@ -38,7 +38,7 @@ Now we will summarize our two objectives for this study:
 
 Tupper et al. (2020) analyzed a model of COVID-19 transmission based on the specifics of social behavior such as reducing transmission rates through masks, social distancing and "bubbling", i.e. limiting social contact. They have concluded that distancing is the most powerful method to reduce transmission, while the effects of masking and bubbling are more situational but still significant. Therefore, based on this study, we would directly expect that `distancing`, `mask_prop` and `other_mask_prop` are important variables that predict lower COVID-19 case counts when at higher levels. It is feasible that the other predictors are important in predicting higher COVID-19 case counts when at higher levels as well, since an argument can be made that they do not pertain to bubbling. We then hypothesize that all predictors will appear in the final selected model.
 
-## Exploratory data analysis
+# Exploratory data analysis
 
 ```{r desc-stat, eval = F}
 means <- sapply(subset(covid,select=-date), mean)
@@ -152,9 +152,9 @@ for (i in 1:ncol(predictors)) {
 }
 ```
 
-Now, we will outline potential approaches to the analysis of this dataset. As mentioned above, we will analyze the both the original dataset and the dataset with time as an encoded categorical variable instead. Firstly, univariate linear models of each predictor against case counts will be examined to gain an initial understanding of how each predictor affects case counts, and a full linear model will be presented to see how the predictors fit together. Secondly, a regularization approach will be employed due to the correlation of many predictors. Most likely, LASSO will be used in order to enable the ranking of the impact of predictors, as it matches the goal of the analysis. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches. However, repeating the first two approaches with various transformations of the predictors is a possibility; this enables us to accurately model the dataset without sacrificing too much interpretability. Finally, once the main questions have been answered by the above two methods, we will attempt to see if the clusters can be characterized by the predictors instead of by date, which is a classification problem. We will decide the range of approaches to employ for this last component of the analysis once we have settled whether we want to interpret the characterization of the clusters or not.
+Now, we will outline potential approaches to the analysis of this dataset. As mentioned above, we will analyze the both the original dataset and the dataset with time as an encoded categorical variable instead. Firstly, univariate linear models of each predictor against case counts will be examined to gain an initial understanding of how each predictor affects case counts, and a full linear model will be presented to see how the predictors fit together. Secondly, a regularization approach will be employed due to the correlation of many predictors. Most likely, LASSO will be used in order to enable the ranking of the impact of predictors, as it matches the goal of the analysis. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches.
 
-## Analysis and results
+# Analysis and results
 
 We will first perform statistical analysis procedures on the data in this section, and then interpret the results.
 
@@ -254,11 +254,22 @@ The full model that ignores the time split has a residual plot that has a very a
 So far, we have pursued the first objective from an inferential standpoint, which slightly deviates from the objective as stated. We will now assume a predictive standpoint and then weigh them in the Discussion section. The CV scores of the previous two full models are as follows. It is clear that the model that recognizes the time split performs much better.
 
 ```{r cv-full}
-cv_fullmod <- mean(full_mod$residuals^2/(1-diag(hatvalues(full_mod)))^2)
+errors1 <- double(nrow(covid))
+errors2 <- double(nrow(covid))
+for (i in 1:nrow(covid)) {
+  train <- covid[-i, ]
+  test <- covid[i, ]
+  full_train <- lm(cases ~ .-time-ts, data = train[,-1])
+  full_train1 <- lm(cases ~ ts*(.-time-ts), data = train[,-1])
+  errors1[i] <- (predict(full_train,test) - test$cases)^2
+  errors2[i] <- (predict(full_train1,test) - test$cases)^2
+}
+
+cv_fullmod <- mean(errors1)
 print("CV score of full model, no time split")
 cv_fullmod
 
-cv_fullmod1 <- mean(full_mod1$residuals^2/(1-diag(hatvalues(full_mod1)))^2)
+cv_fullmod1 <- mean(errors2)
 print("CV score of full model with time split")
 cv_fullmod1
 ```
@@ -331,17 +342,24 @@ for (i in 1:nrow(covid)) {
 print("CV score of stepwise-selected model with time split")
 mean(errors)
 ```
-This leave-one-out CV routine reveals that the stepwise selection procedure gives a model with a CV score that is worse than the full model that recognizes the time split, so the preferred model is still the latter.
+This leave-one-out CV routine reveals that the stepwise selection procedure gives a model with a CV score that is worse than the full model that recognizes the time split, so the preferred model is stepwise selected one from a predictive standpoint.
 
-```{r just-checking, eval = F}
-errors <- double(nrow(covid))
-for (i in 1:nrow(covid)) {
-  train <- covid[-i, ]
-  test <- covid[i, ]
-  full_train <- lm(cases ~ ts*(.-time-ts), data = train[,-1])
-  errors[i] <- (predict(full_train,test) - test$cases)^2
-}
-print("CV score of stepwise-selected model with time split")
-mean(errors)
+# Discussion
+
+The stepwise selected model concludes that `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` are important predictors of COVID-19 case counts, where the relationships of `mask_prop`, `other_mask_prop`, `distancing` and `worked_outside` with `cases` change after July 25th, 2021. This is a superset of the variables concluded to be important from the inference standpoint in the Analysis and results section, so we now briefly justify which conclusion we adopt. Since the first objective prioritizes the prediction of COVID-19 case counts, we will adopt the conclusion of the stepwise selected model. To answer the second objective, we give the following estimate of the regression function of `cases`. Let \(Y\) be a random variable that represents case counts on a particular day, and let \(x_1,x_2,x_3,x_4,x_5,x_6\) be `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` on the same day. Then
+\[\mathbb E[Y | \boldsymbol x = (x_1,x_2,x_3,x_4,x_5,x_6)] = 114.7556 - 4.9958x_1 + 2.5152x_2 - 4.1310x_3 + 0.6665x_4 + 1.4022x_5 + 0.2075x_6 = g_1(\boldsymbol x)\]
+if the day is on or before July 25th, 2021 and
+\[\mathbb E[Y | \boldsymbol x] = g_1(\boldsymbol x) - 557.2660 + 3.2087x_1 + 11.4271x_2 -15.0124x_4 + 4.7663x_5\]
+if the day is after July 25th, 2021.
+
+The current approach assumes that case counts and the included measures of social behavior are only linearly related, which is quite strong. Hence it can be argued that the analysis would be more complete if non-linear functions of the measures were included in the posited models, but it is decided that this is unnecessary. Firstly, the residual plot does not suggest that there are major uncaptured variations in the data unexplained by the model; there is only some heterocedasticity as well as an unusual line towards the left of the plot (i.e. for lower predicted case counts). The heterocedasticity is likely to be resolved by using log case counts instead of plain case counts, but they are monotonic functions of each other, so the answer to the first objective of the study is not likely to change. A method to eliminate the line in the residual plot is currently not known. Secondly, the QQ plot of the residuals shows that the normal errors assumption is not strongly violated. Altogether, the model assumptions hold up well, so the analysis may conclude here.
+
+```{r res-plot-selected}
+par(mfrow = c(1,2))
+plot(forsel_mod, 1)
+plot(forsel_mod, 2)
 ```
+
+
+It is reasonable to doubt the validity of the introduction of the time split in order to improve the predictive performance of the model. In essence, such a decision states that COVID-19 case counts are associated differently to the aspects of social behavior studied after a certain point in time, so the time split is unnatural in a sense. There is only dubious evidence of this in the present data set in the univariate scatterplots and the results of the naive the regression tree, the latter of which was initially based on the assumption that COVID-19 case counts fluctuate in waves and that the tree would identify if there was indeed a transition of waves observed in the dataset. A more compelling approach to judging the validity of the time split as well as potentially identifying a better split in the dataset would be to cluster the observations in the dataset based on the measures of social behavior, effectively leading to a semi-supervised analysis approach. This was not pursued due to time constraints.
 
