@@ -68,7 +68,7 @@ Do not make any changes from here on. Only the TAs will edit the following.
 
 # Checkpoint 2 grade
 
-__Total__ (30 / 30)
+__Total__ (29 / 30)
 
 __Words__ (6 / 6) The text is laid out cleanly, with clear divisions
 and transitions between sections and sub-sections. The writing itself
@@ -80,8 +80,8 @@ __Numbers__ (1 / 1) All numerical results or summaries are reported to
 suitable precision, and with appropriate measures of uncertainty
 attached when applicable. 
 
-__Pictures__ (7 / 7) Figures and tables are easy to read, with
-informative captions, axis labels and legends, and are placed near the
+__Pictures__ (6 / 7) Figures and tables are easy to read, with
+informative ~captions~, axis labels and legends, and are placed near the
 relevant pieces of text or referred to with convenient labels. 
 
 __Code__ (4 / 4) The code is formatted and organized so that it is easy
@@ -100,6 +100,10 @@ __Exploratory data analysis__ (12 / 12) Variables are examined individually and
 bivariately. Features/observations are discussed with appropriate
 figure or tables. The relevance of the EDA to the questions and
 potential models is clearly explained.
+
+## Comments:
+
+1. Don't forget to add captions for your plots!
 
 # Checkpoint 3 grade
 
