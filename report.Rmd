@@ -3,6 +3,8 @@ title: "How does public behavior affect the spread of COVID-19?"
 author: "Quang Vuong"
 output:
   bookdown::pdf_document2
+bibliography: bibliography.bib
+csl: ieee.csl
 ---
 
 ```{r setup, include=FALSE, message = F}
@@ -37,7 +39,7 @@ Now we will summarize our two objectives for this study:
 \item Identify a model which can be used to predict future COVID-19 case counts.
 \end{enumerate}
 
-Tupper et al. (2020) analyzed a model of COVID-19 transmission based on the specifics of social behavior such as reducing transmission rates through masks, social distancing and "bubbling", i.e. limiting social contact. They have concluded that distancing is the most powerful method to reduce transmission, while the effects of masking and bubbling are more situational but still significant. Therefore, based on this study, we would directly expect that `distancing`, `mask_prop` and `other_mask_prop` are important variables that predict lower COVID-19 case counts when at higher levels. It is feasible that the other predictors are important in predicting higher COVID-19 case counts when at higher levels as well, since an argument can be made that they do not pertain to bubbling. We then hypothesize that all predictors will appear in the final selected model.
+Tupper et al. analyzed a model of COVID-19 transmission based on the specifics of social behavior such as reducing transmission rates through masks, social distancing and "bubbling", i.e. limiting social contact @tupper. They have concluded that distancing is the most powerful method to reduce transmission, while the effects of masking and bubbling are more situational but still significant. Therefore, based on this study, we would directly expect that `distancing`, `mask_prop` and `other_mask_prop` are important variables that predict lower COVID-19 case counts when at higher levels. It is feasible that the other predictors are important in predicting higher COVID-19 case counts when at higher levels as well, since an argument can be made that they do not pertain to bubbling. We then hypothesize that all predictors will appear in the final selected model.
 
 # Exploratory data analysis
 
@@ -159,7 +161,7 @@ Now, we will outline potential approaches to the analysis of this dataset. As me
 
 Let \(Y\) be a random variable that represents `cases` on a particular day, and let \(x_1,...,x_8\) denote the same for `distancing`, `bar_visit`,`large_events`,`mask_prop`,`other_mask_prop`,`public_transit`, `resto_visit`, and `worked_outside`. We posit the model
 \[Y = \beta_0 + \sum_{i=1}^8 \beta_ix_i + \varepsilon\]
-where \(\varepsilon\) is normally distributed with mean \(0\) and standard deviation \(\sigma^2\). We examine this model first because it is the simplest. The output of a least squares estimation procedure on the data with this model is as follows.
+where \(\varepsilon\) is normally distributed with mean \(0\) and standard deviation \(\sigma^2\). We examine this model first because it is the simplest. The output of a least squares estimation procedure on the data with this model is as follows. The \(p\)-values are those calculated when testing the hypotheses \(H_0: \beta_i = 0\) versus \(H_a: \beta_i \neq 0\) for each \(\beta_i\) included the model, using the \(t\)-statistic as the test statistic.
 
 ```{r full, eval = T}
 covid <- covid %>% mutate(ts = time >= 51.5)
@@ -170,12 +172,13 @@ At the \(5\%\) significant level, only `distancing`, `bar_visit`, `mask_prop`, `
 
 \[Y = \beta_0 + \beta_1 t + \sum_{i=1}^8 \beta_{i+1}x_i + \sum_{i=1}^8 \beta_{i+9} tx_i + \varepsilon\]
 
-where \(\varepsilon\) is as before and \(t = 0\) if the observation is on or before July 25th, 2021 and \(1\) otherwise. Hence, the time split is encoded as a categorical variable to identify observations as before or after the time split. The output of a least squares estimation procedure on the data for this model is shown below.
+where \(\varepsilon\) is as before and \(t = 0\) if the observation is on or before July 25th, 2021 and \(1\) otherwise. Hence, the time split is encoded as a categorical variable to identify observations as before or after the time split. The output of a least squares estimation procedure on the data for this model is shown below. The \(p\)-values are those calculated when testing the hypotheses \(H_0: \beta_i = 0\) versus \(H_a: \beta_i \neq 0\) for each \(\beta_i\) included in the model, using the \(t\)-statistic as the test statistic.
 
 ```{r full-by-time, eval = T}
 full_mod1 <- lm(cases ~ ts*(.-date-time), data = covid)
 knitr::kable(data.frame(Coefficients = summary(full_mod1)$coefficients[,1], p = summary(full_mod1)$coefficients[,4]), format = "pipe", caption = "Summary of full model with time split")
 ```
+
 At the \(5\%\) significant level, only `large_events` and `other_mask_prop` have significant relationships with `cases` at all times, while `distancing`, `mask_prop` and `public_transit` are only significantly related to `cases` after the split point. Even though it appears that the main effect of the latter variables are insignificant, \(t\) is used to express the clusters in the data where there might be different relationships between `cases` and the predictors, so the conclusions made are sound.
 
 Currently, for the first objective of the study, we have two competing models which provide different answers to the question of which predictors are significantly associated with `cases`. To decide which models to adopt conclusions from, we will check if the error assumptions hold for the two full models by looking at their residual and QQ plots.
@@ -275,7 +278,7 @@ We can see that the stepwise selection procedure gives a model with a CV score t
 
 # Discussion
 
-The stepwise selected model concludes that `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` are important predictors of COVID-19 case counts, where the relationships of `mask_prop`, `other_mask_prop`, `distancing` and `worked_outside` with `cases` change after July 25th, 2021. This is a superset of the variables concluded to be important from the inferential standpoint in the Analysis and results section. Since the first objective prioritizes the prediction of COVID-19 case counts, we will adopt the conclusion of the stepwise selected model instead of the full one. To answer the second objective, we give the following estimate of the regression function of `cases`. Let \(Y\) be a random variable that represents case counts on a particular day, and let \(x_1,x_2,x_3,x_4,x_5,x_6\) be `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` on the same day. Then
+The stepwise selected model concludes that `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` are important predictors of COVID-19 case counts, where the relationships of `mask_prop`, `other_mask_prop`, `distancing` and `worked_outside` with `cases` change after July 25th, 2021. This is a superset of the variables concluded to be important from the inferential standpoint in the Analysis and results section. Since the first objective prioritizes the prediction of COVID-19 case counts, we will adopt the conclusion of the stepwise selected model instead of the full one; moreover, the inferential conclusion suffers from multiple comparison issues. To answer the second objective, we give the following estimate of the regression function of `cases`. Let \(Y\) be a random variable that represents case counts on a particular day, and let \(x_1,x_2,x_3,x_4,x_5,x_6\) be `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` on the same day. Then
 \[\mathbb E[Y | \boldsymbol x = (x_1,x_2,x_3,x_4,x_5,x_6)] = 114.7556 - 4.9958x_1 + 2.5152x_2 - 4.1310x_3 + 0.6665x_4 + 1.4022x_5 + 0.2075x_6 = g_1(\boldsymbol x)\]
 if the day is on or before July 25th, 2021 and
 \[\mathbb E[Y | \boldsymbol x] = g_1(\boldsymbol x) - 557.2660 + 3.2087x_1 + 11.4271x_2 -15.0124x_4 + 4.7663x_5\]
@@ -289,6 +292,7 @@ plot(forsel_mod, 1)
 plot(forsel_mod, 2)
 ```
 
-
 It is reasonable to doubt the validity of the introduction of the time split in order to improve the predictive performance of the model. In essence, such a decision forces the model to say that COVID-19 case counts are associated differently to the aspects of social behavior studied after a certain point in time, so the time split is unnatural in a sense. There is only dubious evidence of this in the present data set in the univariate scatterplots and the results of the naive the regression tree, the latter of which was initially based on the assumption that COVID-19 case counts fluctuate in waves and that the tree would identify if there was indeed a transition of waves observed in the dataset. A more compelling approach for judging the validity of the time split as well as potentially identifying a better split in the dataset would be to cluster the observations in the dataset based on the measures of social behavior, effectively leading to a semi-supervised analysis approach. This was not pursued due to time constraints.
+
+# References
 
