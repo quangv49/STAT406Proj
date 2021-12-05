@@ -8,7 +8,7 @@ csl: ieee.csl
 ---
 
 ```{r setup, include=FALSE, message = F}
-knitr::opts_chunk$set(echo = F)
+knitr::opts_chunk$set(echo = F, warning = F)
 library(glmnet)
 library(tidyverse)
 library(MASS)
@@ -166,9 +166,12 @@ where \(\varepsilon\) is normally distributed with mean \(0\) and standard devia
 ```{r full, eval = T}
 covid <- covid %>% mutate(ts = time >= 51.5)
 full_mod <- lm(cases ~ .-date-time-ts, data = covid)
-knitr::kable(data.frame(Coefficients = summary(full_mod)$coefficients[,1], p = summary(full_mod)$coefficients[,4]), format = "pipe", caption = "Summary of full model, no time split")
+knitr::kable(data.frame(Coefficients = summary(full_mod)$coefficients[,1],
+                        SE = summary(full_mod)$coefficients[,2],
+                        p = summary(full_mod)$coefficients[,4]),
+             format = "pipe", caption = "Summary of full model, no time split")
 ```
-At the \(5\%\) significant level, only `distancing`, `bar_visit`, `mask_prop`, `other_mask_prop` and `public_transit` have an association with `cases`. Now, the existence of the time split identified in the Exploratory data analysis section informs us to posit the model, with the same notation,
+Now, the existence of the time split identified in the Exploratory data analysis section informs us to posit the model, with the same notation,
 
 \[Y = \beta_0 + \beta_1 t + \sum_{i=1}^8 \beta_{i+1}x_i + \sum_{i=1}^8 \beta_{i+9} tx_i + \varepsilon\]
 
@@ -176,14 +179,11 @@ where \(\varepsilon\) is as before and \(t = 0\) if the observation is on or bef
 
 ```{r full-by-time, eval = T}
 full_mod1 <- lm(cases ~ ts*(.-date-time), data = covid)
-knitr::kable(data.frame(Coefficients = summary(full_mod1)$coefficients[,1], p = summary(full_mod1)$coefficients[,4]), format = "pipe", caption = "Summary of full model with time split")
+knitr::kable(data.frame(Coefficients = summary(full_mod1)$coefficients[,1], SE = summary(full_mod1)$coefficients[,2], p = summary(full_mod1)$coefficients[,4]), format = "pipe", caption = "Summary of full model with time split")
 ```
 
-At the \(5\%\) significant level, only `large_events` and `other_mask_prop` have significant relationships with `cases` at all times, while `distancing`, `mask_prop` and `public_transit` are only significantly related to `cases` after the split point. Even though it appears that the main effect of the latter variables are insignificant, \(t\) is used to express the clusters in the data where there might be different relationships between `cases` and the predictors, so the conclusions made are sound.
 
-Currently, for the first objective of the study, we have two competing models which provide different answers to the question of which predictors are significantly associated with `cases`. To decide which models to adopt conclusions from, we will check if the error assumptions hold for the two full models by looking at their residual and QQ plots.
-
-```{r res-plots, fig.cap = "Diagnostic plots for full model without time split (top) and with time split (bottom)", fig.height = 4}
+```{r res-plots, fig.cap = "Diagnostic plots for full model without time split (top) and with time split (bottom)", fig.height = 4, eval = F}
 par(mfrow=c(2,2))
 plot(full_mod, 1)
 plot(full_mod, 2)
@@ -191,9 +191,8 @@ plot(full_mod1, 1)
 plot(full_mod1, 2)
 ```
 
-The full model that ignores the time split has a residual plot that has a very apparent line for observations with lower predicted cases, but it has a QQ plot which suggests only a small violation of the normal errors assumption. The full model that recognizes the time split has a more patternless residual plot, but there seems to be some heterocedasticity as well as a line on the left. The QQ plot for this model suggests a stronger violation of the normal errors assumption than the first model, but it is still minor. Therefore, we prefer the model that recognizes the time split for the first objective.
 
-So far, we have pursued the first objective from an inferential standpoint, which slightly deviates from the objective as stated. We will now assume a predictive standpoint and compare models by their estimated mean squared prediction error. We will estimate this quantity with a leave-one-out cross-validation procedure that computes mean squared errors because it is flexible enough to adapt to the other model-fitting approaches that will be used in this study. The CV scores of the previous two full models are as follows. It is clear that the model that recognizes the time split performs much better.
+We will now compare models by their estimated mean squared prediction error. We will estimate this quantity with a leave-one-out cross-validation procedure that computes mean squared errors because it is flexible enough to adapt to the other model-fitting approaches that will be used in this study. The CV scores of the previous two full models are as follows. It is clear that the model that recognizes the time split performs much better.
 
 ```{r cv-full, eval = T}
 errors1 <- double(nrow(covid))
@@ -210,46 +209,51 @@ for (i in 1:nrow(covid)) {
 cv_fullmod <- mean(errors1)
 print("CV score of full model, no time split")
 cv_fullmod
+print("CV standard error of full model, no time split")
+sd(errors1)/sqrt(nrow(covid))
 
 cv_fullmod1 <- mean(errors2)
 print("CV score of full model with time split")
 cv_fullmod1
+print("CV standard deviation of full model with time split")
+sd(errors2)/sqrt(nrow(covid))
 ```
 Next, we will attempt regularization approaches, owing to the correlation between predictors found in the Exploratory data analysis section. The two models are fitted again using LASSO. The first of them does not split recognize the time split, while the second does. These models have larger CV scores than the unregularized models, indicating that it is likely that all social behavior indicators are important in predicting case counts and informing that a ridge regression procedure might be helpful. However, the latter point does not seem to be the case. The outputs of the `R` code that fits these models are shown below.
 
 ```{r lasso, eval = T}
 lasso_mod <- cv.glmnet(x = matrix(unlist(covid[,2:9]), nrow = nrow(covid)),
-                       y = covid$cases)
+                       y = covid$cases, nfolds = nrow(covid))
 
-print("CV score of LASSO model, no time split")
+print("CV score and standard deviation of LASSO model, no time split")
 lasso_mod$cvm[lasso_mod$lambda == lasso_mod$lambda.min]
+lasso_mod$cvsd[lasso_mod$lambda == lasso_mod$lambda.min]
 ```
 
 ```{r lasso-by-time, eval = T}
 lasso_mod1 <- cv.glmnet(x = matrix(unlist(covid[,c(2:9,12)]), nrow = nrow(covid)),
-                       y = covid$cases)
+                       y = covid$cases, nfolds = nrow(covid))
 
-print("CV score of LASSO model with time split")
+print("CV score and standard deviation of LASSO model with time split")
 lasso_mod1$cvm[lasso_mod1$lambda == lasso_mod1$lambda.min]
-
+lasso_mod1$cvsd[lasso_mod1$lambda == lasso_mod1$lambda.min]
 ```
 
 ```{r ridge, eval = T}
 ridge_mod <- cv.glmnet(x = matrix(unlist(covid[,2:9]), nrow = nrow(covid)),
-                       y = covid$cases, alpha = 0)
+                       y = covid$cases, alpha = 0, nfolds = nrow(covid))
 
-print("CV score of ridge model, no time split")
+print("CV score and standard deviation of ridge model, no time split")
 ridge_mod$cvm[ridge_mod$lambda == ridge_mod$lambda.min]
-
+ridge_mod$cvsd[ridge_mod$lambda == ridge_mod$lambda.min]
 ```
 
 ```{r ridge-by-time, eval = T}
 ridge_mod1 <- cv.glmnet(x = matrix(unlist(covid[,c(2:9,12)]), nrow = nrow(covid)),
-                       y = covid$cases, alpha = 0)
+                       y = covid$cases, alpha = 0, nfolds = nrow(covid))
 
-print("CV score of ridge model with time split")
+print("CV score and standard deviation of ridge model with time split")
 ridge_mod1$cvm[ridge_mod1$lambda == ridge_mod1$lambda.min]
-
+ridge_mod1$cvsd[ridge_mod1$lambda == ridge_mod1$lambda.min]
 ```
 Since both regularization approaches performed worse than the full model, it is concluded that they involved too much bias in the present setting. We still would like to see if the model can be simplified, so we now attempt stepwise variable selection on the full model that recognizes the time split. The function used, `stepAIC`, uses a likelihood-based criterion to add and remove predictors in steps. It is hoped that the properties of the likelihood make this stepwise selection procedure introduce less bias to the model, but we are not sure. The results of the procedure are shown below.
 
@@ -257,7 +261,7 @@ Since both regularization approaches performed worse than the full model, it is 
 null <- lm(cases ~ 1, data = covid)
 forsel_mod <- stepAIC(null , list(lower = null, upper = full_mod1), direction = "both", trace = 0)
 
-knitr::kable(data.frame(Coefficients = summary(forsel_mod)$coefficients[,1], p = summary(forsel_mod)$coefficients[,4]), format = "pipe", caption = "Summary of stepwise selected model with time split")
+knitr::kable(data.frame(Coefficients = summary(forsel_mod)$coefficients[,1], SE = summary(forsel_mod)$coefficients[,2], p = summary(forsel_mod)$coefficients[,4]), format = "pipe", caption = "Summary of stepwise selected model with time split")
 ```
 The stepwise selection procedure ended up selecting a model which omits `resto_visit` and `public_transit` as well as interaction terms of the time split with `bar_visit` and `large_events`. Notably, the time split is kept. To correctly assess the quality of this model, we must perform model fitting and stepwise selection from the beginning on each training set, which is accounted for in the calculations. The CV score of the stepwise-selected procedure is as below.
 
@@ -271,26 +275,29 @@ for (i in 1:nrow(covid)) {
   mod.train <- stepAIC(null_train, list(lower = null_train, upper = full_train), direction = "both", trace = 0)
   errors[i] <- (predict(mod.train,test) - test$cases)^2
 }
-print("CV score of stepwise-selected model with time split")
+print("CV score and standard deviation of stepwise-selected model with time split")
 mean(errors)
+sd(errors)/sqrt(nrow(covid))
 ```
 We can see that the stepwise selection procedure gives a model with a CV score that is slightly better than the full model that recognizes the time split, so the preferred model is stepwise selected one from a predictive standpoint.
 
-# Discussion
-
-The stepwise selected model concludes that `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` are important predictors of COVID-19 case counts, where the relationships of `mask_prop`, `other_mask_prop`, `distancing` and `worked_outside` with `cases` change after July 25th, 2021. This is a superset of the variables concluded to be important from the inferential standpoint in the Analysis and results section. Since the first objective prioritizes the prediction of COVID-19 case counts, we will adopt the conclusion of the stepwise selected model instead of the full one; moreover, the inferential conclusion suffers from multiple comparison issues. To answer the second objective, we give the following estimate of the regression function of `cases`. Let \(Y\) be a random variable that represents case counts on a particular day, and let \(x_1,x_2,x_3,x_4,x_5,x_6\) be `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` on the same day. Then
-\[\mathbb E[Y | \boldsymbol x = (x_1,x_2,x_3,x_4,x_5,x_6)] = 114.7556 - 4.9958x_1 + 2.5152x_2 - 4.1310x_3 + 0.6665x_4 + 1.4022x_5 + 0.2075x_6 = g_1(\boldsymbol x)\]
-if the day is on or before July 25th, 2021 and
-\[\mathbb E[Y | \boldsymbol x] = g_1(\boldsymbol x) - 557.2660 + 3.2087x_1 + 11.4271x_2 -15.0124x_4 + 4.7663x_5\]
-if the day is after July 25th, 2021.
-
-The current approach assumes that case counts and the included measures of social behavior are only linearly related, which is quite strong. Hence it can be argued that the analysis would be more complete if non-linear functions of the measures were included in the posited models, but it is decided that this is unnecessary. Firstly, the residual plot does not suggest that there are major uncaptured variations in the data unexplained by the model; there is only some heterocedasticity as well as an unusual line towards the left of the plot (i.e. for lower predicted case counts). The heterocedasticity is likely to be resolved by using log case counts instead of plain case counts, but they are monotonic functions of each other, so the answer to the first objective of the study is not likely to change. A method to eliminate the line in the residual plot is currently not known. Secondly, the QQ plot of the residuals shows that the normal errors assumption is not strongly violated. Altogether, the model assumptions hold up well, so the analysis may conclude here.
+To judge if non-linear transformations of data are necssary, we will consult the residual and QQ plots of the stepwise-selected model.
 
 ```{r res-plot-selected, fig.cap = "Diagnostic plots of stepwise-selected model.", fig.height=3}
 par(mfrow = c(1,2))
 plot(forsel_mod, 1)
 plot(forsel_mod, 2)
 ```
+
+Firstly, the residual plot does not suggest that there are major uncaptured variations in the data unexplained by the model; there is only some heterocedasticity as well as an unusual line towards the left of the plot (i.e. for lower predicted case counts). The heterocedasticity is likely to be resolved by using log case counts instead of plain case counts, but they are monotonic functions of each other, so the answer to the first objective of the study is not likely to change. A method to eliminate the line in the residual plot is currently not known. Secondly, the QQ plot of the residuals shows that the normal errors assumption is not strongly violated. Altogether, the model assumptions hold up well, so the analysis may conclude here.
+
+# Discussion
+
+The predictive standpoint ignores concerns about hypothesis testing and focuses on which predictors appear in the selected model instead, so the stepwise selected model concludes that `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` are important predictors of COVID-19 case counts, where the relationships of `mask_prop`, `other_mask_prop`, `distancing` and `worked_outside` with `cases` change after July 25th, 2021. This is a superset of the variables concluded to be important from the inferential standpoint in the Analysis and results section. Since the first objective prioritizes the prediction of COVID-19 case counts, we will adopt the conclusion of the stepwise selected model instead of the full one; moreover, the inferential conclusion suffers from multiple comparison issues. To answer the second objective, we give the following estimate of the regression function of `cases`. Let \(Y\) be a random variable that represents case counts on a particular day, and let \(x_1,x_2,x_3,x_4,x_5,x_6\) be `other_mask_prop`, `mask_prop`, `large_events`, `distancing`, `worked_outside` and `bar_visit` on the same day. Then
+\[\mathbb E[Y | \boldsymbol x = (x_1,x_2,x_3,x_4,x_5,x_6)] = 114.7556 - 4.9958x_1 + 2.5152x_2 - 4.1310x_3 + 0.6665x_4 + 1.4022x_5 + 0.2075x_6 = g_1(\boldsymbol x)\]
+if the day is on or before July 25th, 2021 and
+\[\mathbb E[Y | \boldsymbol x] = g_1(\boldsymbol x) - 557.2660 + 3.2087x_1 + 11.4271x_2 -15.0124x_4 + 4.7663x_5\]
+if the day is after July 25th, 2021. Care must be taken in interpreting that coefficients in this model, since they only reflect how expected case counts vary when exactly one indicator of social behavior changes and other indicators are held constant. This does not lend to a natural interpretation of what the model says about how each indicator predicts case counts as a whole; to pursue this objective, the current methods are not suitable.
 
 It is reasonable to doubt the validity of the introduction of the time split in order to improve the predictive performance of the model. In essence, such a decision forces the model to say that COVID-19 case counts are associated differently to the aspects of social behavior studied after a certain point in time, so the time split is unnatural in a sense. There is only dubious evidence of this in the present data set in the univariate scatterplots and the results of the naive the regression tree, the latter of which was initially based on the assumption that COVID-19 case counts fluctuate in waves and that the tree would identify if there was indeed a transition of waves observed in the dataset. A more compelling approach for judging the validity of the time split as well as potentially identifying a better split in the dataset would be to cluster the observations in the dataset based on the measures of social behavior, effectively leading to a semi-supervised analysis approach. This was not pursued due to time constraints.
 
