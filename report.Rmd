@@ -160,13 +160,13 @@ for (i in 1:ncol(predictors)) {
 }
 ```
 
-Now, we will outline potential approaches to the analysis of this dataset. As mentioned above, we will analyze the both the original dataset and the dataset with time as an encoded categorical variable instead. Firstly, a full linear model will be fitted and interpreted from the inferential point of view to answer the first objective. Secondly, this model will be compared against ones obtained via a regularization approach and a variable selection approach. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches.
+Now, we will outline potential approaches to the analysis of this dataset. As mentioned above, we will analyze the both the original dataset and the dataset with time as an encoded categorical variable instead. Firstly, full linear models will be fitted for their simplicity and ease of interpretation. Secondly, these models will be compared against regularized and stepwise-slected models. As interpretation is one of the goals of the analysis, we opt to avoid non-parametric approaches. We will compare the models by their estimated mean squared prediction error calculated from a leave-one-out cross-validation procedure that uses mean squared errors. This estimate is chosen because it is flexible enough to adapt to the other model-fitting approaches that will be used in this study.
 
 # Analysis and results
 
 Let \(Y\) be a random variable that represents `cases` on a particular day, and let \(x_1,...,x_8\) denote the same for `distancing`, `bar_visit`,`large_events`,`mask_prop`,`other_mask_prop`,`public_transit`, `resto_visit`, and `worked_outside`. We first posit the model
 \[Y = \beta_0 + \sum_{i=1}^8 \beta_ix_i + \varepsilon\]
-where \(\varepsilon\) is normally distributed with mean \(0\) and standard deviation \(\sigma^2\). We examine this model first because it is the simplest. Least squares estimation is done on the data to estimate the coefficients in the model; we refrain from showing the results of the estimation before a preferred model has been selected.
+where \(\varepsilon\) is normally distributed with mean \(0\) and standard deviation \(\sigma^2\). Least squares estimation is done on the data to estimate the coefficients in the model; we refrain from showing the results of the estimation before a preferred model has been selected.
 
 ```{r full, eval = T}
 covid <- covid %>% mutate(ts = time >= 51.5)
@@ -176,6 +176,7 @@ full_mod <- lm(cases ~ .-date-time-ts, data = covid)
 #                         p = summary(full_mod)$coefficients[,4]),
 #              format = "pipe", caption = "Summary of full model, no time split")
 ```
+
 Now, the existence of the time split identified in the Exploratory data analysis section informs us to consider the model, with the same notation,
 
 \[Y = \beta_0 + \beta_1 t + \sum_{i=1}^8 \beta_{i+1}x_i + \sum_{i=1}^8 \beta_{i+9} tx_i + \varepsilon\]
@@ -187,8 +188,9 @@ full_mod1 <- lm(cases ~ ts*(.-date-time), data = covid)
 # knitr::kable(data.frame(Coefficients = summary(full_mod1)$coefficients[,1], SE = summary(full_mod1)$coefficients[,2], p = summary(full_mod1)$coefficients[,4]), format = "pipe", caption = "Summary of full model with time split")
 ```
 
+To check if these model assumptions hold well, we will look at their residual and QQ plots in Figure \@ref(fig:res-plots). Both residual plots have an unusual line for lower fitted case counts, but this is much less apparent for the model with the time split. A method to resolve this is currently unknown. There also seems to be some heterocedasticity for both models, which is possibly remedied by fitting log case counts instead. However, it is decided that this is not necessary because homocesdasticity is only involved in calculating standard errors to be used for hypothesis testing of the model coefficients, which is not of importance currently. Otherwise, both QQ plots suggest that the normal errors assumption is upheld quite well, and the residual plot of the full model with the time split is patternless. Therefore, it is concluded that the assumptions of the model with the time split are decently upheld.
 
-```{r res-plots, fig.cap = "Diagnostic plots for full model without time split (top) and with time split (bottom)", fig.height = 4, eval = F}
+```{r res-plots, fig.cap = "Diagnostic plots for full model without time split (top) and with time split (bottom)", fig.height = 4}
 par(mfrow=c(2,2))
 plot(full_mod, 1)
 plot(full_mod, 2)
@@ -196,7 +198,7 @@ plot(full_mod1, 1)
 plot(full_mod1, 2)
 ```
 
-We will now compare the models by their estimated mean squared prediction error. We will estimate this quantity with a leave-one-out cross-validation procedure that computes mean squared errors because it is flexible enough to adapt to the other model-fitting approaches that will be used in this study. The CV scores of the previous two full models are as follows. It is clear that the model that recognizes the time split performs much better.
+The CV scores of the previous two full models are as follows. It is clear that the model that recognizes the time split performs much better.
 
 ```{r cv-full, eval = T}
 errors1 <- double(nrow(covid))
@@ -216,7 +218,10 @@ knitr::kable(data.frame(Model = c("Full linear, no time split", "Full linear wit
              format = "pipe",
              caption = "CV scores and standard errors of the full linear models with and without the time split.")
 ```
-Next, we will attempt regularization approaches, owing to the correlation between predictors found in the Exploratory data analysis section. The two models are fitted again using LASSO. The first of them does not split recognize the time split, while the second does. These models have larger CV scores than the unregularized models, indicating that it is likely that all social behavior indicators are important in predicting case counts and informing that a ridge regression procedure might be helpful. However, the latter point does not seem to be the case. The outputs of the `R` code that fits these models are shown below.
+
+Note that the standard errors of the CV scores are calculated by dividing the standard deviation of the computed scores by the square root by the sample size. This is because the standard deviation of the computed scores is an unbiased estimator of the standard deviation of the out-of-sample squared prediction error, and the division is required to obtain an unbiased estimate of the standard deviation of the mean out-of-sample squared prediction error.
+
+Next, we will attempt regularization approaches, owing to the correlation between predictors found in the Exploratory data analysis section. The two posited models are fitted again using LASSO. These models have larger CV scores than the unregularized models, indicating that it is likely that all social behavior indicators are important in predicting case counts and informing that a ridge regression procedure might be helpful. However, the latter point does not seem to be the case. The CV scores and standard errors of these models are shown below.
 
 ```{r lasso, eval = T}
 lasso_mod <- cv.glmnet(x = matrix(unlist(covid[,2:9]), nrow = nrow(covid)),
@@ -255,7 +260,8 @@ knitr::kable(
   caption = "CV scores and standard errors of regularized models."
 )
 ```
-Since both regularization approaches performed worse than the full model, it is concluded that they involved too much bias in the present setting. We still would like to see if the model can be simplified, so we now attempt stepwise variable selection on the full model that recognizes the time split. The function used, `stepAIC`, uses a likelihood-based criterion to add and remove predictors in steps. It is hoped that the properties of the likelihood make this stepwise selection procedure introduce less bias to the model, but we are not sure. To correctly assess the quality of this model, we must perform model fitting and stepwise selection from the beginning on each training set, which is accounted for in the calculations. The CV score of the stepwise-selected procedure is as below.
+
+Since both regularization approaches performed worse than the full model, it is concluded that they involved too much bias in the present setting. To see if a more parsimonious model performs better, We now attempt stepwise variable selection on the model with the time split. It is hoped that the function used for this procedure, `stepAIC`, introduces less bias into the variable selection due to the properties of the likelihood, but we are not sure. The CV score of the stepwise-selection procedure is as below, where variable selection is performed on each training set.
 
 ```{r stepwise-with-time, eval = T}
 null <- lm(cases ~ 1, data = covid)
@@ -276,9 +282,10 @@ print("CV score and standard deviation of stepwise-selected model with time spli
 mean(errors)
 sd(errors)/sqrt(nrow(covid))
 ```
-We can see that the stepwise selection procedure gives a model with a CV score that is slightly better than the full model that recognizes the time split, so the preferred model is stepwise selected one from a predictive standpoint.
 
-To judge if non-linear transformations of data are necssary, we will consult the residual and QQ plots of the stepwise-selected model in Figure \@ref(fig:res-plot-selected). Firstly, the residual plot does not suggest that there are major uncaptured variations in the data unexplained by the model; there is only some heterocedasticity as well as an unusual line towards the left of the plot (i.e. for lower predicted case counts). The heterocedasticity is likely to be resolved by using log case counts instead of plain case counts, but they are monotonic functions of each other, so the answer to the first objective of the study is not likely to change. A method to eliminate the line in the residual plot is currently not known. Secondly, the QQ plot of the residuals shows that the normal errors assumption is not strongly violated. Altogether, the model assumptions hold up well, so the analysis may conclude here, with the stepwise-selected model being the most preferred one. There is no need to reconsider models with standardized variables because the all of the linear models fitted are scale-invariant, and `cv.glmnet` has built-in scaling.
+We can see that the CV score of this procedure is slightly better than the full model with the time split, so the preferred model is stepwise-selected one from a predictive standpoint.
+
+To judge if non-linear transformations of data are necessary, we will consult the residual and QQ plots of the stepwise-selected model in Figure \@ref(fig:res-plot-selected). They look like those of the full linear model with the time split, which have been discussed previously. Altogether, the model assumptions still hold up well, so the analysis may conclude here, with the stepwise-selected model being the most preferred one. There is no need to reconsider models with standardized variables because the all of the linear models fitted are scale-invariant, and `cv.glmnet` has built-in scaling.
 
 ```{r res-plot-selected, fig.cap = "Diagnostic plots of stepwise-selected model.", fig.height=3}
 par(mfrow = c(1,2))
@@ -299,7 +306,7 @@ The predictive standpoint focuses on which predictors appear in the selected mod
 \[\mathbb E[Y | \boldsymbol x = (x_1,x_2,x_3,x_4,x_5,x_6)] = 114.7556 - 4.9958x_1 + 2.5152x_2 - 4.1310x_3 + 0.6665x_4 + 1.4022x_5 + 0.2075x_6 = g_1(\boldsymbol x)\]
 if the day is on or before July 25th, 2021 and
 \[\mathbb E[Y | \boldsymbol x] = g_1(\boldsymbol x) - 557.2660 + 3.2087x_1 + 11.4271x_2 -15.0124x_4 + 4.7663x_5\]
-if the day is after July 25th, 2021. Care must be taken in interpreting that coefficients in this model, since they only reflect how expected case counts vary when exactly one indicator of social behavior changes and other indicators are held constant. This does not lend to a natural interpretation of what the model says about how each indicator predicts case counts as a whole; to pursue this objective, the current methods are not suitable.
+if the day is after July 25th, 2021. The coefficients in this model should not be interpreted directly because they reflect how expected case counts vary when exactly one indicator of social behavior changes and other indicators are held constant. This does not lend to a natural interpretation of what the model says about how each indicator predicts case counts as a whole; to pursue this objective, the current methods are not suitable.
 
 It is reasonable to doubt the validity of the introduction of the time split in order to improve the predictive performance of the model, which essentially states that the relationship between case counts and public behavior change after a certain point in time. There is only dubious evidence of this in the present data set in the univariate scatterplots and the results of the naive the regression tree, the latter of which was initially based on the assumption that COVID-19 case counts fluctuate in waves and that the tree would identify if there was indeed a transition of waves observed in the dataset. A more compelling approach would essentially be a semi-supervised learning procedure, which was not pursued due to time constraints.
 
